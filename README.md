@@ -66,7 +66,16 @@ The research examines field encoding, admitted history, graph evidence, and thre
 
 ## Sensitivity
 
-The research studies history count, lookback window, target FPR, and calibration risk budget. Dataset-specific full-model settings are embedded in `model/SERA.py` and recorded in each run's JSON output.
+The research studies history count, lookback window, target FPR, and calibration risk budget. Dataset-specific full-model settings are stored in `model/config/datasets.json` and recorded in each run's JSON output.
+
+## Code Structure
+
+- `model/SERA.py`: public `load_config` and `run` entry points.
+- `model/sera/semantic.py`, `context.py`, and `graph.py`: field, historical, and relational evidence.
+- `model/sera/detector.py` and `constraint.py`: fusion scoring and risk calibration.
+- `model/sera/pipeline.py`: training, selection, calibration, and evaluation.
+- `model/sera/contracts.py`, `datasets.py`, `features.py`, and `metrics.py`: checks, data handling, base features, and metrics.
+- `model/config/`: dataset configurations and CSV schemas.
 
 ## Implementation Notes
 

@@ -1,4 +1,5 @@
 """Command-line entry for the SERA fraud-detection pipeline."""
+
 from __future__ import annotations
 
 import argparse
@@ -15,14 +16,18 @@ DATASETS = ("banksim", "sparkov", "ieee-cis", "ibm-aml", "ibm-aml-medium", "ibm-
 
 
 def verify_data(root: Path, dataset: str) -> bool:
-    manifest = json.loads((ROOT / "dataset" / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (ROOT / "dataset" / "manifest.json").read_text(encoding="utf-8")
+    )
     passed = True
     for entry in manifest["files"]:
         if entry["path"].split("/")[0] != dataset:
             continue
         path = root / entry["path"]
         if not path.is_file():
-            print(f"{'MISSING' if entry['required'] else 'OPTIONAL, absent'}: {entry['path']}")
+            print(
+                f"{'MISSING' if entry['required'] else 'OPTIONAL, absent'}: {entry['path']}"
+            )
             passed &= not entry["required"]
             continue
         digest = hashlib.sha256()
@@ -31,9 +36,14 @@ def verify_data(root: Path, dataset: str) -> bool:
                 digest.update(block)
         with path.open(encoding="utf-8-sig", newline="") as stream:
             columns = next(csv.reader(stream))
-        exact = digest.hexdigest() == entry["sha256"] and path.stat().st_size == entry["bytes"]
+        exact = (
+            digest.hexdigest() == entry["sha256"]
+            and path.stat().st_size == entry["bytes"]
+        )
         schema_ok = columns == entry["columns"]
-        print(f"{entry['path']}: reference hash={'MATCH' if exact else 'DIFFERS'}, columns={'MATCH' if schema_ok else 'DIFFER'}")
+        print(
+            f"{entry['path']}: reference hash={'MATCH' if exact else 'DIFFERS'}, columns={'MATCH' if schema_ok else 'DIFFER'}"
+        )
         passed &= exact and schema_ok
     return passed
 
@@ -52,15 +62,37 @@ def json_value(value):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="SERA: schema, history and graph evidence with held-out risk calibration")
+    parser = argparse.ArgumentParser(
+        description="SERA: schema, history and graph evidence with held-out risk calibration"
+    )
     parser.add_argument("--dataset", choices=DATASETS, default="banksim")
     parser.add_argument("--list-datasets", action="store_true")
     parser.add_argument("--seed", type=int, default=2026)
-    parser.add_argument("--datasets-dir", type=Path, default=Path(os.environ.get("MAS_DATASET_DIR", ROOT / "dataset")))
-    parser.add_argument("--output", type=Path, default=Path(os.environ.get("MAS_OUTPUT_DIR", ROOT / "outputs")))
-    parser.add_argument("--check-only", action="store_true", help="Check imports and configuration; does not read data or train")
-    parser.add_argument("--verify-data", action="store_true", help="Check the selected dataset against the reference SHA-256 manifest")
-    parser.add_argument("--window-rows", type=int, help="Override the evaluation window for a smoke run; changes the research protocol")
+    parser.add_argument(
+        "--datasets-dir",
+        type=Path,
+        default=Path(os.environ.get("MAS_DATASET_DIR", ROOT / "dataset")),
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path(os.environ.get("MAS_OUTPUT_DIR", ROOT / "outputs")),
+    )
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="Check imports and configuration; does not read data or train",
+    )
+    parser.add_argument(
+        "--verify-data",
+        action="store_true",
+        help="Check the selected dataset against the reference SHA-256 manifest",
+    )
+    parser.add_argument(
+        "--window-rows",
+        type=int,
+        help="Override the evaluation window for a smoke run; changes the research protocol",
+    )
     args_list = sys.argv[1:] if argv is None else argv
     if not args_list:
         parser.print_help()
@@ -75,19 +107,35 @@ def main(argv=None):
         return 0 if verify_data(args.datasets_dir.resolve(), args.dataset) else 1
 
     from model.SERA import load_config, run
-    from how123.config import validate
+    from model.sera.config import validate
+
     cfg = load_config(args.dataset, args.seed)
     if args.window_rows is not None:
         cfg["window_rows"] = args.window_rows
     validate(cfg)
     if args.check_only:
-        print(json.dumps({"model": "SERA", "dataset": args.dataset, "imports": "OK", "config": "OK", "window_rows": cfg["window_rows"]}))
+        print(
+            json.dumps(
+                {
+                    "model": "SERA",
+                    "dataset": args.dataset,
+                    "imports": "OK",
+                    "config": "OK",
+                    "window_rows": cfg["window_rows"],
+                }
+            )
+        )
         return 0
-    result = run(args.dataset, args.seed, args.datasets_dir, args.output, args.window_rows)
+    result = run(
+        args.dataset, args.seed, args.datasets_dir, args.output, args.window_rows
+    )
     result = json_value({k: v for k, v in result.items() if not k.startswith("_")})
     args.output.mkdir(parents=True, exist_ok=True)
     output = args.output / f"{args.dataset}_full_seed{args.seed}.json"
-    output.write_text(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+    output.write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
     print(f"Saved: {output.resolve()}")
     return 0
 

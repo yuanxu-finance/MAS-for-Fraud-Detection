@@ -1,0 +1,747 @@
+{
+  "banksim": {
+    "window_rows": 400000,
+    "semantic": {
+      "enabled": "auto",
+      "task_prompt": "Detect whether this retail card payment is fraudulent.",
+      "fields": [
+        {
+          "name": "ts",
+          "description": "day index of the simulated period, one step per day",
+          "unit": "unix seconds",
+          "entity_role": "event time",
+          "source": "BankSim step",
+          "in_serialization": false
+        },
+        {
+          "name": "entity",
+          "description": "customer account making the payment",
+          "entity_role": "cardholder",
+          "source": "BankSim customer",
+          "in_serialization": false
+        },
+        {
+          "name": "counterparty",
+          "description": "merchant receiving the payment",
+          "entity_role": "merchant",
+          "source": "BankSim merchant",
+          "in_serialization": false
+        },
+        {
+          "name": "amount",
+          "description": "payment amount",
+          "unit": "euro",
+          "entity_role": "transaction value",
+          "source": "BankSim amount"
+        },
+        {
+          "name": "cat1",
+          "description": "merchant spending category",
+          "entity_role": "spending category",
+          "source": "BankSim category",
+          "codebook": {
+            "es_transportation": "transport and travel",
+            "es_health": "healthcare services",
+            "es_otherservices": "other services",
+            "es_food": "groceries and food",
+            "es_hotelservices": "hotels and lodging",
+            "es_barsandrestaurants": "bars and restaurants",
+            "es_tech": "technology and electronics",
+            "es_sportsandtoys": "sports goods and toys",
+            "es_wellnessandbeauty": "wellness and beauty",
+            "es_hyper": "hypermarket",
+            "es_fashion": "clothing and fashion",
+            "es_home": "home goods",
+            "es_contents": "digital content",
+            "es_travel": "travel bookings",
+            "es_leisure": "leisure activities"
+          }
+        },
+        {
+          "name": "cat2",
+          "description": "binned age bracket of the cardholder",
+          "entity_role": "customer age band",
+          "source": "BankSim age"
+        },
+        {
+          "name": "cat3",
+          "description": "gender of the cardholder",
+          "entity_role": "customer gender",
+          "source": "BankSim gender"
+        },
+        {
+          "name": "text",
+          "description": "no free-text field in this dataset",
+          "source": "n/a",
+          "in_serialization": false
+        }
+      ]
+    },
+    "context": {
+      "enabled": "auto",
+      "mode": "soft",
+      "window_seconds": 2592000,
+      "max_history": 8
+    },
+    "graph": {
+      "enabled": true,
+      "bucket_seconds": 86400,
+      "streams": [
+        {
+          "source": "entity",
+          "target": "counterparty",
+          "relation": "pays",
+          "source_ns": "CUST",
+          "target_ns": "MERCH",
+          "trigger": true
+        }
+      ],
+      "max_seeds_per_bucket": 64,
+      "signal_horizon_buckets": 7
+    },
+    "constraint": {
+      "method": "np",
+      "alpha": 0.01,
+      "delta": 0.05
+    }
+  },
+  "default": {
+    "seed": 2026,
+    "window_rows": 400000,
+    "split": {
+      "mode": "temporal",
+      "ratios": [
+        0.6,
+        0.15,
+        0.1,
+        0.15
+      ],
+      "group_column": null
+    },
+    "semantic": {
+      "enabled": "auto",
+      "embedding_dim": 64,
+      "numeric_bins": 32,
+      "max_text_tokens": 256,
+      "task_prompt": "Detect whether this financial transaction is fraudulent.",
+      "version": "gamma-v1",
+      "fields": []
+    },
+    "context": {
+      "enabled": "auto",
+      "mode": "soft",
+      "window_seconds": 2592000,
+      "top_k": 8,
+      "required_fields": [
+        "amount"
+      ],
+      "compatibility_fields": [],
+      "blocked_value_pairs": {},
+      "soft_relation_fields": [
+        "cat1",
+        "cat2",
+        "cat3"
+      ],
+      "hash_buckets": 512,
+      "embedding_dim": 8,
+      "output_dim": 8,
+      "epochs": 3,
+      "batch_size": 4096,
+      "lr": 0.005,
+      "negative_control": "none"
+    },
+    "graph": {
+      "enabled": true,
+      "bucket_seconds": 86400,
+      "epsilon": 0.01,
+      "bonferroni": true,
+      "trigger": true,
+      "require_prior_history": true,
+      "signal_horizon_buckets": 7,
+      "signal_scope": "seed",
+      "force_rho_one": false,
+      "rho_estimator": "overlap",
+      "rho_min": "auto",
+      "rho_quantile": "auto",
+      "rho_quantile_grid": [
+        0.0,
+        0.5,
+        0.75
+      ],
+      "zeta_mode": "auto",
+      "zeta_mode_grid": [
+        "product",
+        "burst_only"
+      ],
+      "rho_fallback": 0.2,
+      "rho_min_calibration_seeds": 20,
+      "max_seeds_per_bucket": 64,
+      "max_patterns_exported": 2000,
+      "path_samples": 16,
+      "max_hops": 3,
+      "vector_dim": 32,
+      "counter": "exact",
+      "cms_width": 4096,
+      "cms_depth": 5,
+      "add_reverse": true,
+      "streams": []
+    },
+    "detector": {
+      "n_estimators": 800,
+      "max_depth": 6,
+      "learning_rate": 0.05,
+      "subsample": 0.8,
+      "colsample_bytree": 0.8,
+      "min_child_weight": 5,
+      "reg_lambda": 1.0,
+      "scale_pos_weight": "auto",
+      "early_stopping_rounds": 50,
+      "n_jobs": -1
+    },
+    "constraint": {
+      "alpha": 0.01,
+      "delta": 0.05,
+      "method": "np",
+      "capacity_per_window": null
+    },
+    "evaluation": {
+      "selection_criterion": "ap",
+      "fpr_grid": [
+        0.001,
+        0.005,
+        0.01
+      ],
+      "bootstrap": 500,
+      "shap_top_k": 3,
+      "shap_examples": 20,
+      "policy_block_at": 0.7,
+      "policy_investigate_at": 0.4
+    }
+  },
+  "ibm-aml-li": {
+    "window_rows": 2000000,
+    "semantic": {
+      "enabled": "auto",
+      "task_prompt": "Detect whether this bank transfer is part of a money laundering pattern.",
+      "fields": [
+        {
+          "name": "ts",
+          "description": "transaction timestamp at minute granularity",
+          "unit": "unix seconds",
+          "entity_role": "event time",
+          "source": "IBM AML Timestamp",
+          "in_serialization": false
+        },
+        {
+          "name": "entity",
+          "description": "originating bank account",
+          "entity_role": "payer account",
+          "source": "IBM AML Account",
+          "in_serialization": false
+        },
+        {
+          "name": "counterparty",
+          "description": "receiving bank account",
+          "entity_role": "payee account",
+          "source": "IBM AML Account.1",
+          "in_serialization": false
+        },
+        {
+          "name": "amount",
+          "description": "amount paid by the originator",
+          "unit": "source currency",
+          "entity_role": "transaction value",
+          "source": "IBM AML Amount Paid"
+        },
+        {
+          "name": "cat1",
+          "description": "settlement instrument used for the transfer",
+          "entity_role": "payment instrument",
+          "source": "IBM AML Payment Format",
+          "codebook": {
+            "ACH": "automated clearing house transfer",
+            "Cheque": "paper cheque",
+            "Credit Card": "credit card payment",
+            "Cash": "cash deposit or withdrawal",
+            "Wire": "wire transfer",
+            "Bitcoin": "bitcoin transfer",
+            "Reinvestment": "reinvested proceeds"
+          }
+        },
+        {
+          "name": "cat2",
+          "description": "currency in which the payee is credited",
+          "entity_role": "settlement currency",
+          "source": "IBM AML Receiving Currency"
+        },
+        {
+          "name": "cat3",
+          "description": "receiving bank identifier",
+          "entity_role": "counterparty institution",
+          "source": "IBM AML To Bank"
+        },
+        {
+          "name": "text",
+          "description": "no free-text field in this dataset",
+          "source": "n/a",
+          "in_serialization": false
+        }
+      ]
+    },
+    "context": {
+      "enabled": "auto",
+      "mode": "soft",
+      "window_seconds": 21600,
+      "max_history": 8
+    },
+    "graph": {
+      "enabled": true,
+      "bucket_seconds": 1800,
+      "streams": [
+        {
+          "source": "entity",
+          "target": "counterparty",
+          "relation": "transfer",
+          "source_ns": "ACC",
+          "target_ns": "ACC",
+          "trigger": true
+        }
+      ],
+      "max_seeds_per_bucket": 64,
+      "signal_horizon_buckets": 4
+    },
+    "constraint": {
+      "method": "np",
+      "alpha": 0.01,
+      "delta": 0.05
+    }
+  },
+  "ibm-aml-medium": {
+    "window_rows": 2000000,
+    "semantic": {
+      "enabled": "auto",
+      "task_prompt": "Detect whether this bank transfer is part of a money laundering pattern.",
+      "fields": [
+        {
+          "name": "ts",
+          "description": "transaction timestamp at minute granularity",
+          "unit": "unix seconds",
+          "entity_role": "event time",
+          "source": "IBM AML Timestamp",
+          "in_serialization": false
+        },
+        {
+          "name": "entity",
+          "description": "originating bank account",
+          "entity_role": "payer account",
+          "source": "IBM AML Account",
+          "in_serialization": false
+        },
+        {
+          "name": "counterparty",
+          "description": "receiving bank account",
+          "entity_role": "payee account",
+          "source": "IBM AML Account.1",
+          "in_serialization": false
+        },
+        {
+          "name": "amount",
+          "description": "amount paid by the originator",
+          "unit": "source currency",
+          "entity_role": "transaction value",
+          "source": "IBM AML Amount Paid"
+        },
+        {
+          "name": "cat1",
+          "description": "settlement instrument used for the transfer",
+          "entity_role": "payment instrument",
+          "source": "IBM AML Payment Format",
+          "codebook": {
+            "ACH": "automated clearing house transfer",
+            "Cheque": "paper cheque",
+            "Credit Card": "credit card payment",
+            "Cash": "cash deposit or withdrawal",
+            "Wire": "wire transfer",
+            "Bitcoin": "bitcoin transfer",
+            "Reinvestment": "reinvested proceeds"
+          }
+        },
+        {
+          "name": "cat2",
+          "description": "currency in which the payee is credited",
+          "entity_role": "settlement currency",
+          "source": "IBM AML Receiving Currency"
+        },
+        {
+          "name": "cat3",
+          "description": "receiving bank identifier",
+          "entity_role": "counterparty institution",
+          "source": "IBM AML To Bank"
+        },
+        {
+          "name": "text",
+          "description": "no free-text field in this dataset",
+          "source": "n/a",
+          "in_serialization": false
+        }
+      ]
+    },
+    "context": {
+      "enabled": "auto",
+      "mode": "soft",
+      "window_seconds": 21600,
+      "max_history": 8
+    },
+    "graph": {
+      "enabled": true,
+      "bucket_seconds": 1800,
+      "streams": [
+        {
+          "source": "entity",
+          "target": "counterparty",
+          "relation": "transfer",
+          "source_ns": "ACC",
+          "target_ns": "ACC",
+          "trigger": true
+        }
+      ],
+      "max_seeds_per_bucket": 64,
+      "signal_horizon_buckets": 4
+    },
+    "constraint": {
+      "method": "np",
+      "alpha": 0.01,
+      "delta": 0.05
+    }
+  },
+  "ibm-aml": {
+    "window_rows": 600000,
+    "semantic": {
+      "task_prompt": "Detect whether this interbank transfer is part of a money-laundering pattern.",
+      "fields": [
+        {
+          "name": "ts",
+          "description": "transaction timestamp",
+          "unit": "unix seconds",
+          "entity_role": "event time",
+          "source": "IBM AML transaction log",
+          "in_serialization": false
+        },
+        {
+          "name": "entity",
+          "description": "originating account identifier",
+          "entity_role": "payer account",
+          "source": "IBM AML transaction log",
+          "in_serialization": false
+        },
+        {
+          "name": "counterparty",
+          "description": "beneficiary account identifier",
+          "entity_role": "payee account",
+          "source": "IBM AML transaction log",
+          "in_serialization": false
+        },
+        {
+          "name": "amount",
+          "description": "amount paid by the originating account",
+          "unit": "currency units of the payment currency",
+          "entity_role": "transaction value",
+          "source": "IBM AML transaction log"
+        },
+        {
+          "name": "cat1",
+          "description": "payment rail used to settle the transfer",
+          "entity_role": "payment channel",
+          "source": "IBM AML transaction log"
+        },
+        {
+          "name": "cat2",
+          "description": "receiving bank identifier, prefixed with BANK",
+          "entity_role": "beneficiary institution",
+          "source": "IBM AML transaction log"
+        },
+        {
+          "name": "cat3",
+          "description": "currency in which the beneficiary is credited",
+          "unit": "ISO currency name",
+          "entity_role": "settlement currency",
+          "source": "IBM AML transaction log"
+        },
+        {
+          "name": "text",
+          "description": "no free-text field in this dataset",
+          "source": "n/a",
+          "in_serialization": false
+        },
+        {
+          "name": "f_amount_received",
+          "description": "amount credited to the beneficiary account",
+          "unit": "currency units of the receiving currency",
+          "entity_role": "transaction value",
+          "source": "IBM AML transaction log"
+        },
+        {
+          "name": "f_cross_currency",
+          "description": "1 if paying and receiving currency differ",
+          "entity_role": "settlement flag",
+          "source": "derived at load time"
+        },
+        {
+          "name": "f_cross_bank",
+          "description": "1 if originating and receiving bank differ",
+          "entity_role": "settlement flag",
+          "source": "derived at load time"
+        }
+      ]
+    },
+    "context": {
+      "window_seconds": 21600,
+      "top_k": 8,
+      "compatibility_fields": [
+        "cat3"
+      ],
+      "soft_relation_fields": [
+        "cat1",
+        "cat2",
+        "cat3"
+      ]
+    },
+    "graph": {
+      "bucket_seconds": 1800,
+      "streams": [
+        {
+          "source": "entity",
+          "target": "counterparty",
+          "relation": "transfer",
+          "source_ns": "ACC",
+          "target_ns": "ACC",
+          "trigger": true
+        }
+      ],
+      "max_seeds_per_bucket": 64,
+      "signal_horizon_buckets": 4
+    },
+    "constraint": {
+      "alpha": 0.01,
+      "delta": 0.05
+    }
+  },
+  "ieee-cis": {
+    "window_rows": 400000,
+    "semantic": {
+      "enabled": "auto",
+      "task_prompt": "Detect whether this card transaction is fraudulent.",
+      "fields": [
+        {
+          "name": "ts",
+          "description": "transaction timestamp derived from TransactionDT",
+          "unit": "unix seconds",
+          "entity_role": "event time",
+          "source": "IEEE-CIS transaction table",
+          "in_serialization": false
+        },
+        {
+          "name": "entity",
+          "description": "card identifier hash",
+          "entity_role": "payment card",
+          "source": "IEEE-CIS card1",
+          "in_serialization": false
+        },
+        {
+          "name": "counterparty",
+          "description": "billing address region of the transaction",
+          "entity_role": "billing region",
+          "source": "IEEE-CIS addr1",
+          "in_serialization": false
+        },
+        {
+          "name": "amount",
+          "description": "transaction amount",
+          "unit": "USD",
+          "entity_role": "transaction value",
+          "source": "IEEE-CIS TransactionAmt"
+        },
+        {
+          "name": "cat1",
+          "description": "product code of the purchased item",
+          "entity_role": "product category",
+          "source": "IEEE-CIS ProductCD",
+          "codebook": {
+            "W": "web purchase",
+            "C": "card-present or catalogue",
+            "R": "refund or reversal",
+            "H": "hospitality",
+            "S": "services"
+          }
+        },
+        {
+          "name": "cat2",
+          "description": "card network",
+          "entity_role": "card scheme",
+          "source": "IEEE-CIS card4",
+          "codebook": {
+            "visa": "Visa",
+            "mastercard": "Mastercard",
+            "discover": "Discover",
+            "american express": "American Express"
+          }
+        },
+        {
+          "name": "cat3",
+          "description": "funding type of the card",
+          "entity_role": "funding type",
+          "source": "IEEE-CIS card6",
+          "codebook": {
+            "debit": "debit card, funds drawn immediately",
+            "credit": "credit card, funds drawn on a line of credit"
+          }
+        },
+        {
+          "name": "text",
+          "description": "no free-text field in this dataset",
+          "source": "n/a",
+          "in_serialization": false
+        }
+      ]
+    },
+    "context": {
+      "enabled": "auto",
+      "mode": "soft",
+      "window_seconds": 2592000,
+      "max_history": 8
+    },
+    "graph": {
+      "enabled": true,
+      "bucket_seconds": 86400,
+      "streams": [
+        {
+          "source": "entity",
+          "target": "counterparty",
+          "relation": "pays",
+          "source_ns": "CARD",
+          "target_ns": "ADDR",
+          "trigger": true
+        }
+      ],
+      "max_seeds_per_bucket": 64,
+      "signal_horizon_buckets": 7
+    },
+    "constraint": {
+      "method": "np",
+      "alpha": 0.01,
+      "delta": 0.05
+    }
+  },
+  "sparkov": {
+    "window_rows": 400000,
+    "semantic": {
+      "task_prompt": "Detect whether this card-present or card-not-present purchase is fraudulent.",
+      "fields": [
+        {
+          "name": "ts",
+          "description": "transaction timestamp",
+          "unit": "unix seconds",
+          "entity_role": "event time",
+          "source": "Sparkov generator",
+          "in_serialization": false
+        },
+        {
+          "name": "entity",
+          "description": "card number of the payer",
+          "entity_role": "payment card",
+          "source": "Sparkov generator",
+          "in_serialization": false
+        },
+        {
+          "name": "counterparty",
+          "description": "merchant that accepted the payment",
+          "entity_role": "merchant",
+          "source": "Sparkov generator",
+          "in_serialization": false
+        },
+        {
+          "name": "amount",
+          "description": "purchase amount",
+          "unit": "USD",
+          "entity_role": "transaction value",
+          "source": "Sparkov generator"
+        },
+        {
+          "name": "cat1",
+          "description": "merchant spending category",
+          "entity_role": "merchant category",
+          "source": "Sparkov generator",
+          "codebook": {
+            "grocery_pos": "in-store grocery",
+            "grocery_net": "online grocery",
+            "gas_transport": "fuel and transport",
+            "misc_net": "online miscellaneous",
+            "misc_pos": "in-store miscellaneous",
+            "shopping_net": "online shopping",
+            "shopping_pos": "in-store shopping",
+            "entertainment": "entertainment",
+            "food_dining": "food and dining",
+            "personal_care": "personal care",
+            "health_fitness": "health and fitness",
+            "home": "home goods",
+            "kids_pets": "kids and pets",
+            "travel": "travel"
+          }
+        },
+        {
+          "name": "cat2",
+          "description": "US state in the cardholder billing address",
+          "entity_role": "cardholder region",
+          "source": "Sparkov generator"
+        },
+        {
+          "name": "cat3",
+          "description": "declared occupation of the cardholder",
+          "entity_role": "cardholder attribute",
+          "source": "Sparkov generator"
+        },
+        {
+          "name": "text",
+          "description": "no free-text field in this dataset",
+          "source": "n/a",
+          "in_serialization": false
+        },
+        {
+          "name": "f_city_pop",
+          "description": "population of the cardholder city",
+          "unit": "residents",
+          "entity_role": "cardholder region attribute",
+          "source": "Sparkov generator"
+        }
+      ]
+    },
+    "context": {
+      "window_seconds": 2592000,
+      "top_k": 8,
+      "soft_relation_fields": [
+        "cat1",
+        "cat2",
+        "cat3"
+      ]
+    },
+    "graph": {
+      "bucket_seconds": 86400,
+      "streams": [
+        {
+          "source": "entity",
+          "target": "counterparty",
+          "relation": "pays",
+          "source_ns": "CARD",
+          "target_ns": "MERCH",
+          "trigger": true
+        }
+      ],
+      "max_seeds_per_bucket": 64,
+      "signal_horizon_buckets": 7
+    },
+    "constraint": {
+      "alpha": 0.01,
+      "delta": 0.05
+    }
+  }
+}

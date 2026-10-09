@@ -1,0 +1,282 @@
+{
+  "sparkov": {
+    "ssn": {
+      "dtype": "object"
+    },
+    "cc_num": {
+      "dtype": "int64"
+    },
+    "first": {
+      "dtype": "object"
+    },
+    "last": {
+      "dtype": "object"
+    },
+    "gender": {
+      "dtype": "object"
+    },
+    "city": {
+      "dtype": "object"
+    },
+    "state": {
+      "dtype": "object"
+    },
+    "zip": {
+      "dtype": "int64"
+    },
+    "city_pop": {
+      "dtype": "int64"
+    },
+    "job": {
+      "dtype": "object"
+    },
+    "dob": {
+      "dtype": "object"
+    },
+    "acct_num": {
+      "dtype": "int64"
+    },
+    "trans_num": {
+      "dtype": "object"
+    },
+    "trans_date": {
+      "dtype": "object"
+    },
+    "trans_time": {
+      "dtype": "object"
+    },
+    "unix_time": {
+      "dtype": "int64"
+    },
+    "category": {
+      "dtype": "object"
+    },
+    "amt": {
+      "dtype": "float64"
+    },
+    "is_fraud": {
+      "dtype": "int64"
+    },
+    "merchant": {
+      "dtype": "object"
+    }
+  },
+  "ieee-cis": {
+    "transaction_id": {
+      "dtype": "int64"
+    },
+    "transaction_dt": {
+      "dtype": "int64"
+    },
+    "transaction_ts": {
+      "dtype": "datetime64[us]"
+    },
+    "transaction_amt": {
+      "dtype": "float64"
+    },
+    "log_amt": {
+      "dtype": "float64"
+    },
+    "hour_of_day": {
+      "dtype": "int64"
+    },
+    "day_of_week": {
+      "dtype": "int64"
+    },
+    "product_cd": {
+      "dtype": "object"
+    },
+    "has_identity": {
+      "dtype": "int32"
+    },
+    "is_fraud": {
+      "dtype": "int64"
+    },
+    "card1": {
+      "dtype": "int64"
+    },
+    "card2": {
+      "dtype": "float64"
+    },
+    "card3": {
+      "dtype": "float64"
+    },
+    "card4": {
+      "dtype": "object"
+    },
+    "card5": {
+      "dtype": "float64"
+    },
+    "card6": {
+      "dtype": "object"
+    },
+    "addr1": {
+      "dtype": "float64"
+    },
+    "addr2": {
+      "dtype": "float64"
+    },
+    "dist1": {
+      "dtype": "float64"
+    },
+    "dist2": {
+      "dtype": "float64"
+    },
+    "purchaser_email_domain": {
+      "dtype": "object"
+    },
+    "recipient_email_domain": {
+      "dtype": "object"
+    },
+    "C1": {
+      "dtype": "float64"
+    },
+    "C2": {
+      "dtype": "float64"
+    },
+    "C3": {
+      "dtype": "float64"
+    },
+    "C4": {
+      "dtype": "float64"
+    },
+    "C5": {
+      "dtype": "float64"
+    },
+    "C6": {
+      "dtype": "float64"
+    },
+    "C7": {
+      "dtype": "float64"
+    },
+    "C8": {
+      "dtype": "float64"
+    },
+    "C9": {
+      "dtype": "float64"
+    },
+    "C10": {
+      "dtype": "float64"
+    },
+    "C11": {
+      "dtype": "float64"
+    },
+    "C12": {
+      "dtype": "float64"
+    },
+    "C13": {
+      "dtype": "float64"
+    },
+    "C14": {
+      "dtype": "float64"
+    },
+    "D1": {
+      "dtype": "float64"
+    },
+    "D2": {
+      "dtype": "float64"
+    },
+    "D3": {
+      "dtype": "float64"
+    },
+    "D4": {
+      "dtype": "float64"
+    },
+    "D5": {
+      "dtype": "float64"
+    },
+    "D10": {
+      "dtype": "float64"
+    },
+    "D11": {
+      "dtype": "float64"
+    },
+    "D15": {
+      "dtype": "float64"
+    },
+    "M1_enc": {
+      "dtype": "float64"
+    },
+    "M2_enc": {
+      "dtype": "float64"
+    },
+    "M3_enc": {
+      "dtype": "float64"
+    },
+    "M4_enc": {
+      "dtype": "float64"
+    },
+    "M5_enc": {
+      "dtype": "float64"
+    },
+    "M6_enc": {
+      "dtype": "float64"
+    },
+    "M7_enc": {
+      "dtype": "float64"
+    },
+    "M8_enc": {
+      "dtype": "float64"
+    },
+    "M9_enc": {
+      "dtype": "float64"
+    },
+    "id_01": {
+      "dtype": "float64"
+    },
+    "id_02": {
+      "dtype": "float64"
+    },
+    "id_03": {
+      "dtype": "float64"
+    },
+    "id_05": {
+      "dtype": "float64"
+    },
+    "id_06": {
+      "dtype": "float64"
+    },
+    "id_09": {
+      "dtype": "float64"
+    },
+    "id_11": {
+      "dtype": "float64"
+    },
+    "id_13": {
+      "dtype": "float64"
+    },
+    "id_17": {
+      "dtype": "float64"
+    },
+    "id_19": {
+      "dtype": "float64"
+    },
+    "id_20": {
+      "dtype": "float64"
+    },
+    "device_type": {
+      "dtype": "object"
+    },
+    "card1_txn_count": {
+      "dtype": "int64"
+    },
+    "card1_avg_amt": {
+      "dtype": "float64"
+    },
+    "card1_historical_fraud_rate": {
+      "dtype": "float64"
+    },
+    "email_txn_count": {
+      "dtype": "float64"
+    },
+    "email_historical_fraud_rate": {
+      "dtype": "float64"
+    },
+    "is_high_risk_product": {
+      "dtype": "int32"
+    },
+    "amt_vs_card_avg_ratio": {
+      "dtype": "float64"
+    }
+  }
+}
