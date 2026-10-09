@@ -69,7 +69,7 @@ from _ours_runtime import CONFIG
 CONFIG_DIR = str(CONFIG)
 
 def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> Dict[str, Any]:
-    """递归合并；override 的叶子覆盖 base，dict 继续下钻，list 整体替换。"""
+    """Recursively merge mappings, replacing lists and leaf values."""
     out = dict(copy.deepcopy(dict(base)))
     for key, value in override.items():
         if key in out and isinstance(out[key], dict) and isinstance(value, Mapping):
@@ -96,11 +96,11 @@ def set_path(cfg: Dict[str, Any], dotted: str, value: Any) -> None:
     node[parts[-1]] = value
 
 def apply_overrides(cfg: Mapping[str, Any], overrides: Mapping[str, Any]) -> Dict[str, Any]:
-    """按点号路径覆盖。未知路径不会被静默接受——先建后校验，validate 会拦。"""
+    """Apply dotted-path overrides and reject unknown configuration paths."""
     out = copy.deepcopy(dict(cfg))
     for dotted, value in overrides.items():
         if get_path(out, dotted, _MISSING) is _MISSING:
-            raise KeyError(f'覆盖路径在配置中不存在：{dotted}（防止消融臂写错字段名而静默无效）')
+            raise KeyError(f'Unknown configuration override path: {dotted}')
         set_path(out, dotted, value)
     return out
 
@@ -117,58 +117,58 @@ def load_config(dataset, config_dir=None):
     return cfg
 
 def validate(cfg: Mapping[str, Any]) -> None:
-    """跑之前一次性检查取值范围。放过一个非法值的代价是几十分钟后才报错。"""
+    """Validate configuration ranges and required fields before execution."""
     alpha = float(get_path(cfg, 'constraint.alpha'))
     delta = float(get_path(cfg, 'constraint.delta'))
     if not 0.0 < alpha < 1.0 or not 0.0 < delta < 1.0:
-        raise ValueError('constraint.alpha 与 constraint.delta 必须落在 (0,1)')
+        raise ValueError('constraint.alpha and constraint.delta must be in (0,1)')
     if get_path(cfg, 'constraint.method') not in ('np', 'empirical', 'fixed'):
-        raise ValueError('constraint.method 只能是 np / empirical / fixed')
+        raise ValueError('constraint.method must be np, empirical, or fixed')
     eps = float(get_path(cfg, 'graph.epsilon'))
     if not 0.0 < eps < 1.0:
-        raise ValueError('graph.epsilon 必须落在 (0,1)')
+        raise ValueError('graph.epsilon must be in (0,1)')
     if get_path(cfg, 'graph.counter') not in ('exact', 'cms'):
-        raise ValueError('graph.counter 只能是 exact 或 cms')
+        raise ValueError('graph.counter must be exact or cms')
     if float(get_path(cfg, 'graph.bucket_seconds')) <= 0:
-        raise ValueError('graph.bucket_seconds 必须为正')
+        raise ValueError('graph.bucket_seconds must be positive')
     if get_path(cfg, 'context.mode') not in ('soft', 'hard'):
-        raise ValueError('context.mode 只能是 soft 或 hard')
+        raise ValueError('context.mode must be soft or hard')
     if int(get_path(cfg, 'context.top_k')) <= 0:
-        raise ValueError('context.top_k 必须为正')
+        raise ValueError('context.top_k must be positive')
     if float(get_path(cfg, 'context.window_seconds')) <= 0:
-        raise ValueError('context.window_seconds 必须为正')
+        raise ValueError('context.window_seconds must be positive')
     if str(get_path(cfg, 'semantic.enabled')).lower() not in ('auto', 'text_only', 'true', 'false'):
-        raise ValueError('semantic.enabled 只能是 auto / text_only / true / false')
+        raise ValueError('semantic.enabled must be auto, text_only, true, or false')
     if get_path(cfg, 'evaluation.selection_criterion') not in ('ap', 'tpr_at_alpha'):
-        raise ValueError('evaluation.selection_criterion 只能是 ap 或 tpr_at_alpha')
+        raise ValueError('evaluation.selection_criterion must be ap or tpr_at_alpha')
     quantile = get_path(cfg, 'graph.rho_quantile')
     if isinstance(quantile, str):
         if quantile.lower() != 'auto':
-            raise ValueError('graph.rho_quantile 只能是 auto 或 [0,1] 内的数')
+            raise ValueError('graph.rho_quantile must be auto or a number in [0,1]')
         grid = get_path(cfg, 'graph.rho_quantile_grid') or []
         if not grid or any((not 0.0 <= float(q) <= 1.0 for q in grid)):
-            raise ValueError('graph.rho_quantile=auto 时 rho_quantile_grid 必须非空且取值在 [0,1]')
+            raise ValueError('Automatic graph.rho_quantile requires a nonempty rho_quantile_grid with values in [0,1]')
     elif not 0.0 <= float(quantile) <= 1.0:
-        raise ValueError('graph.rho_quantile 必须落在 [0,1]')
+        raise ValueError('graph.rho_quantile must be in [0,1]')
     zeta = get_path(cfg, 'graph.zeta_mode', 'product')
     if str(zeta).lower() == 'auto':
         grid = get_path(cfg, 'graph.zeta_mode_grid') or []
         if not grid or any((g not in ('product', 'burst_only') for g in grid)):
-            raise ValueError('zeta_mode_grid 的取值只能是 product 或 burst_only')
+            raise ValueError('zeta_mode_grid values must be product or burst_only')
     elif zeta not in ('product', 'burst_only'):
-        raise ValueError('graph.zeta_mode 只能是 auto / product / burst_only')
+        raise ValueError('graph.zeta_mode must be auto, product, or burst_only')
     ratios = get_path(cfg, 'split.ratios')
     if len(ratios) != 4 or any((r <= 0 for r in ratios)) or abs(sum(ratios) - 1.0) > 1e-08:
-        raise ValueError('split.ratios 必须是四个正数且和为 1（train/tune/calibration/test）')
+        raise ValueError('split.ratios must contain four positive values summing to 1 (train/tune/calibration/test)')
     if get_path(cfg, 'split.mode') not in ('temporal', 'group'):
-        raise ValueError('split.mode 只能是 temporal 或 group')
+        raise ValueError('split.mode must be temporal or group')
     if get_path(cfg, 'split.mode') == 'group' and (not get_path(cfg, 'split.group_column')):
-        raise ValueError('split.mode=group 时必须给出 split.group_column')
+        raise ValueError('split.group_column is required for group splits')
     if not get_path(cfg, 'semantic.fields'):
-        raise ValueError('semantic.fields（领域语义规格 Γ）不得为空——1.4.1 的前提是字段说明受控而非模型猜测')
+        raise ValueError('semantic.fields must contain explicit field specifications')
 
 def config_digest(cfg: Mapping[str, Any]) -> str:
-    """配置指纹，写进结果文件，避免"结果对不上但不知道跑的是哪版配置"。"""
+    """Hash the configuration for reproducible result tracking."""
     import hashlib
     payload = json.dumps(cfg, sort_keys=True, ensure_ascii=False, default=str).encode('utf-8')
     return hashlib.blake2b(payload, digest_size=8).hexdigest()
@@ -182,11 +182,11 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 import numpy as np
 
 class ContractViolation(RuntimeError):
-    """任何一条全局契约被破坏都抛这个，不做降级处理。"""
+    """Raised when a pipeline contract is violated."""
 
 @dataclass(frozen=True)
 class FieldSpec:
-    """Γ 中单个字段的受控说明。对应 §1.4.1 的 (n_j, d_j, u_j, c_j, ρ_j, g_j, ω_j)。"""
+    """Field metadata, entity role, and decision-time availability."""
     name: str
     description: str = ''
     unit: str = ''
@@ -209,7 +209,7 @@ class FieldSpec:
 
 @dataclass(frozen=True)
 class SemanticSpec:
-    """全局契约 Γ。语义层、上文层、图层共用同一份，不是语义模块的私有产物（§4.1）。"""
+    """Shared field schema for semantic, historical, and graph features."""
     fields: Mapping[str, FieldSpec]
     task_description: str
     version: str = 'gamma-v1'
@@ -225,10 +225,10 @@ class SemanticSpec:
         try:
             return self.fields[name]
         except KeyError as exc:
-            raise KeyError(f'字段 {name!r} 未在 Γ 中登记；1.4.1 不允许模型自行猜测匿名字段') from exc
+            raise KeyError(f'Field {name!r} is not registered in the schema') from exc
 
     def is_empty_spec(self) -> bool:
-        """Γ 取空规格时 1.4.1 必须逐字退化为普通序列化（§4.5 不变量）。"""
+        """Return whether the schema contains no field specifications."""
         return all((not (f.description or f.unit or f.codebook or f.entity_role or f.source) for f in self.fields.values()))
 
     def posthoc_fields(self) -> Tuple[str, ...]:
@@ -237,16 +237,16 @@ class SemanticSpec:
     def validate_columns(self, columns: Iterable[str]) -> None:
         unknown = sorted(set(columns) - set(self.fields))
         if unknown:
-            raise ContractViolation(f'以下列未在 Γ 中登记，不得进入表示：{unknown}')
+            raise ContractViolation(f'Feature columns missing from the schema: {unknown}')
 
 class TemporalAvailabilityGuard:
-    """把 ω_j <= t 与 E_t = {e : τ_e <= t} 落成可调用的检查。"""
+    """Validate decision-time field, history, and edge availability."""
 
     def __init__(self, gamma: SemanticSpec) -> None:
         self.gamma = gamma
 
     def visible_fields(self, columns: Sequence[str], event_time: float, decision_time: float) -> Tuple[List[str], List[str]]:
-        """返回 (可见字段, 因 ω_j > t 被排除的字段)。"""
+        """Return available fields and fields excluded by their availability times."""
         visible, excluded = ([], [])
         for name in columns:
             spec = self.gamma.field(name)
@@ -257,35 +257,35 @@ class TemporalAvailabilityGuard:
         return (visible, excluded)
 
     def assert_no_posthoc(self, used_columns: Iterable[str]) -> int:
-        """契约一：判定后字段不得出现在任何表示的输入列里。返回检查的列数。"""
+        """Reject post-event fields and return the number of checked columns."""
         used = list(used_columns)
         banned = set(self.gamma.posthoc_fields())
         hit = sorted(set(used) & banned)
         if hit:
-            raise ContractViolation(f'判定后字段进入了表示：{hit}（ω_j = +inf，契约一）')
+            raise ContractViolation(f'Post-event fields found in feature inputs: {hit} (availability time is infinite)')
         return len(used)
 
     @staticmethod
     def assert_history_window(current_ts: np.ndarray, history_ts: np.ndarray, valid_mask: np.ndarray, window_seconds: float) -> int:
-        """契约二：被采纳的历史必须满足 0 < τ_t - τ_i <= W。返回检查的 (行, 槽) 数。"""
+        """Validate admitted history lags and return the checked slot count."""
         if valid_mask.size == 0:
             return 0
         lag = current_ts[:, None] - history_ts
         bad = valid_mask & ~((lag > 0) & (lag <= window_seconds))
         if bool(bad.any()):
             idx = np.argwhere(bad)[0]
-            raise ContractViolation(f'被采纳的历史越界：行 {int(idx[0])} 槽 {int(idx[1])} lag={float(lag[idx[0], idx[1]])}')
+            raise ContractViolation(f'Admitted history outside the allowed window: row {int(idx[0])} slot {int(idx[1])} lag={float(lag[idx[0], idx[1]])}')
         return int(valid_mask.size)
 
     @staticmethod
     def assert_causal_edges(edge_ts: np.ndarray, decision_time: float) -> int:
-        """契约二：图计算只在 E_t 上进行。返回检查的边数。"""
+        """Reject future edges and return the number of checked edges."""
         if edge_ts.size and float(edge_ts.max()) > decision_time:
-            raise ContractViolation(f'未来边进入了 as-of 视图：max(τ_e)={float(edge_ts.max())} > t={decision_time}')
+            raise ContractViolation(f'Future edge in the as-of view: max(edge_time)={float(edge_ts.max())} > t={decision_time}')
         return int(edge_ts.size)
 
 class ScorerLifecycle:
-    """冻结点状态机。NP 次序统计量的论证依赖 s(x) 在校准后不再改变（§4.2 契约三）。"""
+    """Require scorer freezing before calibration and deployment."""
     TRAINING, TUNING, FROZEN, CALIBRATED = ('TRAINING', 'TUNING', 'FROZEN', 'CALIBRATED')
 
     def __init__(self) -> None:
@@ -294,24 +294,24 @@ class ScorerLifecycle:
 
     def enter_tuning(self) -> None:
         if self.state != self.TRAINING:
-            raise ContractViolation(f'不能从 {self.state} 进入调参阶段')
+            raise ContractViolation(f'Cannot transition from {self.state} to tuning')
         self.state = self.TUNING
 
     def freeze(self) -> int:
         if self.state not in (self.TRAINING, self.TUNING):
-            raise ContractViolation(f'不能从 {self.state} 冻结')
+            raise ContractViolation(f'Cannot transition from {self.state} to frozen')
         self.version += 1
         self.state = self.FROZEN
         return self.version
 
     def mark_calibrated(self) -> None:
         if self.state != self.FROZEN:
-            raise ContractViolation('NP 校准要求评分器已冻结')
+            raise ContractViolation('NP calibration requires a frozen scorer')
         self.state = self.CALIBRATED
 
     def assert_scoring_allowed(self) -> None:
         if self.state not in (self.FROZEN, self.CALIBRATED):
-            raise ContractViolation('部署打分要求评分器已冻结')
+            raise ContractViolation('Deployment scoring requires a frozen scorer')
 
 @dataclass
 class CheckResult:
@@ -321,11 +321,7 @@ class CheckResult:
     detail: str = ''
 
 class ContractAuditor:
-    """收集契约检查结果。
-
-    memory 里踩过的坑：校验器"通过"要看匹配计数——数目为 0 时输出与真过一模一样。
-    因此这里强制每项检查上报 n_checked，n_checked == 0 一律记 SKIPPED。
-    """
+    """Record check counts and statuses; empty checks are marked SKIPPED."""
     CONTROL_LAYER_NAMES = ('trigger', 'triggered', 'is_trigger', 'm_t', 'epsilon_t', 'burst_gate', 'seed_flag')
 
     def __init__(self) -> None:
@@ -333,24 +329,19 @@ class ContractAuditor:
 
     def record(self, name: str, n_checked: int, ok: bool=True, detail: str='') -> None:
         if n_checked <= 0:
-            self.results.append(CheckResult(name, 'SKIPPED', 0, detail or '检查对象为空'))
+            self.results.append(CheckResult(name, 'SKIPPED', 0, detail or 'No objects to check'))
         else:
             self.results.append(CheckResult(name, 'PASSED' if ok else 'FAILED', n_checked, detail))
 
     def flag(self, name: str, n_checked: int, clean: bool, detail: str='') -> None:
-        """诊断项：越限记 REVIEW 而不是 FAILED。
-
-        契约违反（因果、冻结、切分复用）是硬失败，管线不该继续；而"某个特征与标签的
-        相关性偏高"只是一个"去看一眼"的信号——强真信号也会触发它。两者混在同一个
-        passed 里，会让真正的契约失败被淹没。
-        """
+        """Record diagnostic exceedances as REVIEW rather than contract failures."""
         if n_checked <= 0:
-            self.results.append(CheckResult(name, 'SKIPPED', 0, detail or '检查对象为空'))
+            self.results.append(CheckResult(name, 'SKIPPED', 0, detail or 'No objects to check'))
         else:
             self.results.append(CheckResult(name, 'PASSED' if clean else 'REVIEW', n_checked, detail))
 
     def run(self, name: str, fn, detail: str='') -> None:
-        """执行一项检查；fn 必须返回它实际检查了多少个对象。"""
+        """Run a check whose return value is the number of objects inspected."""
         try:
             n = int(fn())
             self.record(name, n, True, detail)
@@ -361,7 +352,7 @@ class ContractAuditor:
         lowered = {n.lower() for n in feature_names}
         hit = sorted((n for n in self.CONTROL_LAYER_NAMES if n in lowered))
         if hit:
-            raise ContractViolation(f'控制层量进入了 s(x)：{hit}（§4.3 范畴错误）')
+            raise ContractViolation(f'Control-layer quantities found in scorer inputs: {hit}')
         return len(feature_names)
 
     @property
@@ -380,11 +371,11 @@ class ContractAuditor:
         return {'passed': self.passed, 'n_checks': len(self.results), 'n_passed': sum((1 for r in self.results if r.status == 'PASSED')), 'n_failed': sum((1 for r in self.results if r.status == 'FAILED')), 'n_review': self.n_review, 'n_skipped': self.n_skipped, 'checks': [{'name': r.name, 'status': r.status, 'n_checked': r.n_checked, 'detail': r.detail} for r in self.results]}
 
     def summary_line(self) -> str:
-        return f"契约审计: {sum((1 for r in self.results if r.status == 'PASSED'))} PASSED / {sum((1 for r in self.results if r.status == 'FAILED'))} FAILED / {self.n_review} REVIEW / {self.n_skipped} SKIPPED"
+        return f"Contract audit: {sum((1 for r in self.results if r.status == 'PASSED'))} PASSED / {sum((1 for r in self.results if r.status == 'FAILED'))} FAILED / {self.n_review} REVIEW / {self.n_skipped} SKIPPED"
 
 @dataclass(frozen=True)
 class PatternEntry:
-    """§2.1.3 的 p=(S,R,T,A)，四个分量各有出处（§2.4.8 输出表）。"""
+    """Structural, relational, temporal, and attribute evidence for a pattern."""
     pattern_id: str
     S: Tuple[str, ...]
     R: Tuple[Tuple[str, str, str], ...]
@@ -424,7 +415,7 @@ def roc_auc(labels: np.ndarray, scores: np.ndarray) -> float:
     return float(roc_auc_score(labels, scores))
 
 def tpr_at_fpr(labels: np.ndarray, scores: np.ndarray, target_fpr: float) -> float:
-    """在合法样本分数的 (1−fpr) 分位处取阈值，再算 TPR。"""
+    """Evaluate TPR at the negative-score quantile for the requested FPR."""
     negatives = scores[labels == 0]
     positives = scores[labels == 1]
     if negatives.size == 0 or positives.size == 0:
@@ -504,11 +495,7 @@ def bootstrap_ap(labels: np.ndarray, scores: np.ndarray, repeats: int=1000, seed
     return out
 
 def paired_bootstrap_delta(labels: np.ndarray, scores_a: np.ndarray, scores_b: np.ndarray, repeats: int=1000, seed: int=2026) -> Dict[str, float]:
-    """同一组重抽样索引同时作用于两臂，因此比较的是配对差而不是两个独立区间。
-
-    两个独立的 95% 区间重叠并不意味着差异不显著；消融要回答的是"这一层去掉后指标是否
-    变了"，那必须是配对量。
-    """
+    """Estimate paired metric differences using shared bootstrap indices."""
     rng = np.random.default_rng(seed)
     n = labels.size
     deltas = np.empty(repeats, dtype=np.float64)
@@ -561,20 +548,7 @@ class Dataset:
         return f'<Dataset {self.name} rows={len(self.frame)} pos={self.frame.label.mean():.5f}>'
 
 def _unix_seconds(s: pd.Series) -> pd.Series:
-    """把任意 datetime 列换成 unix 秒——**不能假设底层单位是纳秒**。
-
-    2026-09-03 踩到的真 bug：`astype("int64")` 返回的是该列**自己那个单位**下的整数，
-    而 pandas 2.x 的 datetime64 有 ns / us / ms / s 四种单位。从 parquet 读回来的
-    IEEE-CIS `transaction_ts` 是 `datetime64[us]`，代码却按纳秒除 `10**9`，
-    **时间戳被整体压缩了 1000 倍**：真实跨度 182 天被算成 0.18 天。
-
-    后果不是"数字难看"而是整层失效：`graph.bucket_seconds=1800` 于是相当于真实的
-    21 天，整个 40 万行窗口只落进约 6 个桶，MIDAS 在结构上就不可能检出任何突发；
-    `context.window_seconds=21600`（6 小时）则覆盖了全部历史，1.4.2 的"只取过去
-    某窗口"这条契约实际不成立。IEEE-CIS 上 how2 测不出，根因在这里。
-
-    `astype("datetime64[s]")` 先把列统一到秒单位再取整数，对四种单位都正确。
-    """
+    """Convert datetimes to Unix seconds regardless of their stored time unit."""
     if pd.api.types.is_datetime64_any_dtype(s):
         return s.astype('datetime64[s]').astype('int64')
     return pd.to_numeric(s, errors='coerce').astype('int64')
@@ -611,7 +585,7 @@ def _intent_json(fn: str) -> Any:
         return json.load(fh)
 
 def _intent_frames() -> pd.DataFrame:
-    """三个协议 schema 完全不同，必须逐协议按各自路径取字段，不得共用列。"""
+    """Read each protocol using its own field schema."""
     rows: List[Dict[str, Any]] = []
     for r in _intent_json('uniswap.json'):
         tx, md = (r.get('proposed_tx') or {}, r.get('metadata') or {})
@@ -643,18 +617,10 @@ def load_intent_tx_18k(window: int, include_posthoc: bool=False) -> Dataset:
         keep.append('posthoc')
     else:
         d = d.drop(columns=['posthoc'])
-    return _finalize('intent-tx-18k', d[keep], dict(source='github.com/duanyiyao/intent-tx-18k', task='intent-transaction alignment（正类 = REJECT）', time_unit='unix 秒，但取自 generated_at / block_time_unix，是样本生成时间而非交易时间', caveat='配对生成：每个实体/文本首次出现记 ACCEPT、其后每次记 REJECT。任何基于历史计数的特征都是标签的近似复制，图层与上文计数在此数据集上不可用；按时间切分也不成立（三协议时间范围互不重叠），须按 text 分组切分。'))
+    return _finalize('intent-tx-18k', d[keep], dict(source='github.com/duanyiyao/intent-tx-18k', task='Intent-transaction alignment (positive class: REJECT)', time_unit='Unix seconds from generated_at or block_time_unix (sample-generation time)', caveat='Paired generation assigns ACCEPT to first entity/text occurrences and REJECT thereafter. Disable graph and history-count features; use text-grouped splits because protocol time ranges do not overlap.'))
 
 def load_ibm_aml(window: int) -> Dataset:
-    """IBM AML HI-Small 分册（Altman 等，NeurIPS 2023 D&B）。
-
-    读未压缩的 `HI-Small_Trans.csv`。先前读的是 `transactions_full.csv.zip`——同一份
-    数据的压缩版（行数、正类率、时间范围三项逐一核对相同），但该 zip 于 2026-09-02
-    在磁盘上消失，原因不明；当时 ibm-aml 仍能跑只是因为窗口缓存命中，一旦清缓存就会
-    装载失败。改读 CSV 后不再依赖那个已不存在的文件。
-
-    两个路径都探测：zip 若被放回，优先用它（体积小十倍）。
-    """
+    """Load IBM AML HI-Small from the archive or uncompressed CSV."""
     folder = os.path.join(DATA_DIR, 'ibm-aml')
     archive = os.path.join(folder, 'transactions_full.csv.zip')
     plain = os.path.join(folder, 'HI-Small_Trans.csv')
@@ -666,7 +632,7 @@ def load_ibm_aml(window: int) -> Dataset:
     elif os.path.exists(plain):
         raw = pd.read_csv(plain)
     else:
-        raise FileNotFoundError(f'ibm-aml 的交易表两个位置都不存在：{archive} 与 {plain}。该数据集是 IBM AML HI-Small 分册，需重新放回其中之一。')
+        raise FileNotFoundError(f'IBM AML HI-Small transaction data not found at either path: {archive} and {plain}. Provide the archive or uncompressed CSV.')
     full_rows, full_rate = (len(raw), float(raw['Is Laundering'].mean()))
     raw['_ts'] = pd.to_datetime(raw['Timestamp'], errors='coerce')
     raw = _middle_window(raw, '_ts', window)
@@ -674,10 +640,10 @@ def load_ibm_aml(window: int) -> Dataset:
     d['f_amount_received'] = pd.to_numeric(raw['Amount Received'], errors='coerce').values
     d['f_cross_currency'] = (raw['Receiving Currency'] != raw['Payment Currency']).astype(int).values
     d['f_cross_bank'] = (raw['From Bank'] != raw['To Bank']).astype(int).values
-    return _finalize('ibm-aml', d, dict(source='github.com/IBM/AML-Data（CDLA-Sharing-1.0）；Altman et al., NeurIPS 2023 D&B', task='反洗钱（正类 = Is Laundering）', time_unit='unix 秒（真实时钟）', note=f'全量 {full_rows:,} 行、正类率 {full_rate:.6f}；此处取中段窗口；另有官方模式族标注 pattern_labels.csv（8 个洗钱典型）'))
+    return _finalize('ibm-aml', d, dict(source='github.com/IBM/AML-Data(CDLA-Sharing-1.0); Altman et al., NeurIPS 2023 D&B', task='Anti-money laundering (positive class: Is Laundering)', time_unit='Unix seconds', note=f'Full dataset: {full_rows:,} rows; positive rate: {full_rate:.6f}; uses a middle window; family labels are in pattern_labels.csv'))
 
 def load_aml_pattern_labels() -> pd.DataFrame:
-    """官方洗钱典型标注。按 (时间, 发起账户, 对手账户, 付款金额) 回连主表。"""
+    """Join family labels by timestamp, accounts, and payment amount."""
     d = pd.read_csv(os.path.join(DATA_DIR, 'ibm-aml', 'pattern_labels.csv'))
     d['_t'] = pd.to_datetime(d.Timestamp, errors='coerce')
     d['ts'] = _unix_seconds(d['_t'])
@@ -693,7 +659,7 @@ def load_sparkov(window: int) -> Dataset:
     raw = _middle_window(raw, 'unix_time', window)
     d = pd.DataFrame(dict(ts=raw['unix_time'].astype(float), entity=raw['cc_num'].astype(str), counterparty=raw['merchant'].astype(str), amount=raw['amt'].astype(float), cat1=raw['category'].astype(str), cat2=raw['state'].astype(str), cat3=raw['job'].astype(str), text='', label=raw['is_fraud'].astype(int)))
     d['f_city_pop'] = pd.to_numeric(raw['city_pop'], errors='coerce').values
-    return _finalize('sparkov', d, dict(source='Sparkov 生成器；HF Nooha/cc_fraud_detection_dataset', task='信用卡交易欺诈', time_unit='unix 秒', note=f'全量 {full_rows:,} 行、正类率 {full_rate:.6f}；997 张卡 / 648 商户；实测无生成假象（图特征-标签最大 |r|=0.093），作干净对照'))
+    return _finalize('sparkov', d, dict(source='Sparkov generator; HF Nooha/cc_fraud_detection_dataset', task='Credit-card transaction fraud', time_unit='Unix seconds', note=f'Full dataset: {full_rows:,} rows; positive rate: {full_rate:.6f}; generated card transactions'))
 
 def load_tabformer_cc(window: int) -> Dataset:
     raw = pd.read_csv(os.path.join(DATA_DIR, 'tabformer-cc', 'transactions_sample-1500k.csv'))
@@ -705,19 +671,10 @@ def load_tabformer_cc(window: int) -> Dataset:
     raw = _middle_window(raw, '_ts', window)
     d = pd.DataFrame(dict(ts=raw['_ts'].astype(float), entity=raw['User'].astype(str) + '-' + raw['Card'].astype(str), counterparty=raw['Merchant Name'].astype(str), amount=pd.to_numeric(raw['Amount'].astype(str).str.replace('$', '', regex=False), errors='coerce'), cat1='MCC' + raw['MCC'].astype(str), cat2=raw['Merchant City'].astype(str), cat3=raw['Use Chip'].astype(str), text='', label=(raw['Is Fraud?'].astype(str).str.strip().str.lower() == 'yes').astype(int)))
     d['f_has_error'] = raw['Errors?'].notna().astype(int).values
-    return _finalize('tabformer-cc', d, dict(source='github.com/IBM/TabFormer；Padhi et al., ICASSP 2021', task='信用卡交易欺诈', time_unit='unix 秒（由 Year/Month/Day/Time 合成）', note=f'本地样本 {full_rows:,} 行、正类率 {full_rate:.6f}；图层的反例，用于界定适用范围'))
+    return _finalize('tabformer-cc', d, dict(source='github.com/IBM/TabFormer; Padhi et al., ICASSP 2021', task='Credit-card transaction fraud', time_unit='Unix seconds derived from Year/Month/Day/Time', note=f'Local sample: {full_rows:,} rows; positive rate: {full_rate:.6f}'))
 
 def load_s_ffsd(window: int) -> Dataset:
-    """S-FFSD（GTAN, AAAI 2023 的数据集）。
-
-    半监督数据集：`Labels` 有 0 / 1 / 2 三个取值，**2 表示未标注**（48,238 行，占 62%）。
-    本课题是全监督评价，只能用 0/1 那部分，剔除后 29,643 行、正类率 0.177。
-    这一点必须随结果声明——它不是抽样，是数据集本身只标了三分之一。
-
-    验收（Diagnostics/d05）四项全过：无标签泄漏（Source/Target/Location 的
-    "此前出现过"Precision 相对正类率均为 0.59–1.01×）、实体对重复率 43.3%
-    （四个原数据集里最高，MIDAS 的突发检验最有依据）、四段各自有正类。
-    """
+    """Load labeled S-FFSD rows, excluding label 2 (unlabeled)."""
     path = os.path.join(DATA_DIR, 's-ffsd', 'S-FFSD.csv')
     raw = pd.read_csv(path)
     full_rows = len(raw)
@@ -726,21 +683,10 @@ def load_s_ffsd(window: int) -> Dataset:
     full_rate = float(raw['Labels'].mean())
     raw = _middle_window(raw, 'Time', window)
     d = pd.DataFrame(dict(ts=raw['Time'].astype(float), entity=raw['Source'].astype(str), counterparty=raw['Target'].astype(str), amount=raw['Amount'].astype(float), cat1=raw['Location'].astype(str), cat2=raw['Type'].astype(str), cat3='', text='', label=raw['Labels'].astype(int)))
-    return _finalize('s-ffsd', d, dict(source='S-FFSD（Xiang 等，AAAI 2023 GTAN 附带数据）', task='交易欺诈（半监督标注）', time_unit='序号（等间隔，非真实秒）', note=f'原始 {full_rows:,} 行，其中 {n_unlabeled:,} 行标签=2 即未标注，已剔除；剩 {len(raw):,} 行、正类率 {full_rate:.6f}。cat3 留空：该数据集只有 Location 与 Type 两个类别字段'))
+    return _finalize('s-ffsd', d, dict(source='S-FFSD (Xiang et al., AAAI 2023 GTAN)', task='Transaction fraud (partially labeled)', time_unit='Equally spaced row index, not clock seconds', note=f'Original: {full_rows:,} rows; {n_unlabeled:,} unlabeled rows (label 2) removed; remaining: {len(raw):,} rows; positive rate: {full_rate:.6f}; cat3 is empty because only Location and Type are categorical fields'))
 
 def load_ieee_cis(window: int) -> Dataset:
-    """IEEE-CIS Fraud Detection（Kaggle 2019，Vesta 提供的真实信用卡数据）。
-
-    与其余数据集的关键差别，须随结果声明：**该数据集刻意不提供商户标识**，
-    因此没有真正意义上的对手方。这里取 `addr1`（账单地区）作 counterparty——
-    332 个取值、实体对重复率 60.5%，二部图是"卡 × 地区"而非"卡 × 商户"。
-    这对 how2 的语义是有影响的：能检出的是"同一张卡在某地区的交易突发"，
-    而不是"某商户上的团伙聚集"。备选的 `recipient_email_domain` 更差——
-    缺失 76.7%、仅 60 个取值，二部图会退化成卡 × 类别。
-
-    验收（Diagnostics/d05）：无标签泄漏（三个键的"此前出现过"Precision 相对
-    正类率均为 1.00×）、四段各自有正类、测试段正类 3,083。
-    """
+    """Load IEEE-CIS using billing region as the counterparty proxy."""
     path = os.path.join(DATA_DIR, 'ieee-cis', 'ieee_cis_fraud_features.parquet')
     raw = read_dataset_csv(path)
     full_rows, full_rate = (len(raw), float(raw['is_fraud'].mean()))
@@ -751,29 +697,10 @@ def load_ieee_cis(window: int) -> Dataset:
     for col in ('dist1', 'C1', 'C13', 'D1', 'D15'):
         if col in raw.columns:
             d[f'f_{col.lower()}'] = pd.to_numeric(raw[col], errors='coerce').values
-    return _finalize('ieee-cis', d, dict(source='IEEE-CIS Fraud Detection（Kaggle 2019 / Vesta）', task='信用卡交易欺诈', time_unit='unix 秒（由 TransactionDT 换算）', note=f'全量 {full_rows:,} 行、正类率 {full_rate:.6f}；无商户字段，counterparty 取 addr1（账单地区），二部图为卡×地区'))
+    return _finalize('ieee-cis', d, dict(source='IEEE-CIS Fraud Detection(Kaggle 2019 / Vesta)', task='Credit-card transaction fraud', time_unit='Unix seconds derived from TransactionDT', note=f'Full dataset: {full_rows:,} rows; positive rate: {full_rate:.6f}; counterparty uses addr1 (billing region); graph nodes represent cards and regions'))
 
 def load_paysim(window: int) -> Dataset:
-    """PaySim（Lopez-Rojas 等，移动支付模拟器；Kaggle ealaxi/paysim1）。
-
-    **entity 取收款方 nameDest 而非付款方 nameOrig**，这是被数据结构逼出来的：
-    `nameOrig` 有 6,353,307 个唯一值对 6,362,620 行，即几乎每笔交易都换一个新付款方，
-    付款方没有任何历史可言；而 `nameDest` 只有 2,722,362 个，客户收款账户收款次数
-    中位数为 4、最多 113，且 67.5% 的欺诈行其收款方收过至少两笔。上文块 a_t 要的是
-    "同一实体的过去交易"，在这份数据上只有收款方视角成立。这也符合该模拟器的欺诈
-    设计——欺诈发生在中间账户（骡子账户）的收款侧。
-
-    **图层在本数据集上停用**：实体对重复率为 0.00%（即使只取客户对客户的 421 万行
-    也是如此），每个 (付款方, 收款方) 组合都唯一。MIDAS 数的是实体对在时间片内的
-    边数，全部为 1，没有突发可检测。这与 intent-tx-18k 的停用原因不同——那里是标签
-    泄漏，这里是结构上根本不存在可重复的边。
-
-    `isFlaggedFraud` 不进任何表示：它只在 isFraud=1 时被置 1（16 行），是判定之后
-    写下的标记，正是 Γ 的 ω_j 该拦住的东西。
-
-    验收（Diagnostics/d05）：无标签泄漏（三个键相对正类率 0.65–1.50×）、四段各自
-    有正类、r = α(1−π)/π = 2.37 ≥ 0.25 即误报预算充足。
-    """
+    """Load PaySim using recipient history and excluding isFlaggedFraud."""
     path = os.path.join(DATA_DIR, 'PaySim', 'PS_20174392719_1491204439457_log.csv')
     raw = pd.read_csv(path, usecols=['step', 'type', 'amount', 'nameOrig', 'nameDest', 'oldbalanceOrg', 'newbalanceOrig', 'oldbalanceDest', 'newbalanceDest', 'isFraud'])
     full_rows, full_rate = (len(raw), float(raw['isFraud'].mean()))
@@ -782,52 +709,30 @@ def load_paysim(window: int) -> Dataset:
     d = pd.DataFrame(dict(ts=raw['_ts'].astype(float), entity=raw['nameDest'].astype(str), counterparty=raw['nameOrig'].astype(str), amount=raw['amount'].astype(float), cat1=raw['type'].astype(str), cat2=np.where(raw['nameDest'].astype(str).str.startswith('M'), 'MERCHANT', 'CUSTOMER'), cat3='', text='', label=raw['isFraud'].astype(int)))
     for col in ('oldbalanceOrg', 'newbalanceOrig', 'oldbalanceDest', 'newbalanceDest'):
         d[f'f_{col.lower()}'] = pd.to_numeric(raw[col], errors='coerce').values
-    return _finalize('paysim', d, dict(source='PaySim 移动支付模拟器（Kaggle ealaxi/paysim1）', task='移动支付欺诈', time_unit='unix 秒（由 step×3600 换算，step 为 1 小时一步）', note=f'全量 {full_rows:,} 行、正类率 {full_rate:.6f}；entity 取收款方（付款方每笔都换新 ID，无历史）；图层停用：实体对重复率 0.00%，MIDAS 无突发可测；isFlaggedFraud 已剔除（判定后写入的标记）'))
+    return _finalize('paysim', d, dict(source='PaySim mobile-payment simulator (Kaggle ealaxi/paysim1)', task='Mobile-payment fraud', time_unit='Unix seconds derived from hourly steps', note=f'Full dataset: {full_rows:,} rows; positive rate: {full_rate:.6f}; entity uses recipients; graph disabled for nonrepeating entity pairs; post-event isFlaggedFraud excluded'))
 
 def _load_ibm_variant(name: str, folder: str, filename: str, note: str, window: int) -> Dataset:
-    """IBM AML 的 LI-Small / HI-Medium 分册。与 `load_ibm_aml` 同一 schema。
-
-    分开写 loader 而不是给 `load_ibm_aml` 加参数，是因为每个分册的窗口宽度、
-    时间片长度都要各自在配置里定——它们的规模与欺诈率差一个量级，共用配置会错。
-    """
+    """Load an IBM AML variant using the shared transaction schema."""
     path = os.path.join(DATA_DIR, folder, filename)
     if not os.path.exists(path):
-        raise FileNotFoundError(f'{name} 的交易表不存在：{path}')
+        raise FileNotFoundError(f'{name} transaction file not found: {path}')
     raw = pd.read_csv(path)
     full_rows, full_rate = (len(raw), float(raw['Is Laundering'].mean()))
     raw['_ts'] = _unix_seconds(pd.to_datetime(raw['Timestamp'], errors='coerce'))
     raw = _middle_window(raw, '_ts', window)
     d = pd.DataFrame(dict(ts=raw['_ts'].astype(float), entity=raw['Account'].astype(str), counterparty=raw['Account.1'].astype(str), amount=pd.to_numeric(raw['Amount Paid'], errors='coerce'), cat1=raw['Payment Format'].astype(str), cat2='BANK' + raw['To Bank'].astype(str), cat3=raw['Receiving Currency'].astype(str), text='', label=raw['Is Laundering'].astype(int)))
-    return _finalize(name, d, dict(source='IBM AML（Altman 等，NeurIPS 2023 D&B），Kaggle ealtman2019 全分册', task='反洗钱', time_unit='unix 秒（由 Timestamp 换算）', note=f'全量 {full_rows:,} 行、正类率 {full_rate:.6f}。{note}'))
+    return _finalize(name, d, dict(source='IBM AML (Altman et al., NeurIPS 2023 D&B); Kaggle ealtman2019', task='Anti-money laundering', time_unit='Unix seconds derived from Timestamp', note=f'Full dataset: {full_rows:,} rows; positive rate: {full_rate:.6f}. {note}'))
 
 def load_ibm_aml_li(window: int) -> Dataset:
-    """LI-Small：Low-Illicit 分册，正类率 0.052%，比 HI-Small 低一半。
-
-    验收（Diagnostics/d05）五关全过：无标签泄漏（三个键 1.00–1.05×）、
-    实体对重复率 55.5%、四段各自有正类、r=13.82。
-    它的价值在于把方法的适用区间往**更极端的不平衡**再推一档。
-    """
-    return _load_ibm_variant('ibm-aml-li', 'ibm-aml-li', 'LI-Small_Trans.csv', 'LI = 低非法比例分册，与 HI-Small 同生成器不同欺诈率档位', window)
+    """Load the IBM AML LI-Small variant."""
+    return _load_ibm_variant('ibm-aml-li', 'ibm-aml-li', 'LI-Small_Trans.csv', 'LI-Small uses the same generator as HI-Small with lower illicit prevalence', window)
 
 def load_ibm_aml_medium(window: int) -> Dataset:
-    """HI-Medium：3,189 万行，是全部数据集里规模最大、图结构最密的一份。
-
-    验收在**中段 200 万行窗口**上做（与实际使用口径一致，全量载入要十几 GB 内存）：
-    无标签泄漏（0.85–1.00×）、**实体对重复率 71.7%（全部数据集最高）**、
-    测试段 266 个正类、r=11.27。
-    """
-    return _load_ibm_variant('ibm-aml-medium', 'ibm-aml-medium', 'HI-Medium_Trans.csv', 'HI-Medium 分册；实体对重复率 71.7%，图结构最密', window)
+    """Load the IBM AML HI-Medium variant."""
+    return _load_ibm_variant('ibm-aml-medium', 'ibm-aml-medium', 'HI-Medium_Trans.csv', 'HI-Medium variant', window)
 
 def load_banksim(window: int) -> Dataset:
-    """BankSim（Lopez-Rojas 与 Axelsson，零售银行卡消费模拟器）。
-
-    全部字段都带引号（`'C1093826151'`），装载时统一剥掉——不剥的话 entity 与
-    counterparty 会带着引号进图层，与其余数据集的键格式不一致。
-
-    验收（Diagnostics/d05）五关全过：无标签泄漏（0.98–1.00×）、实体对重复率 54.2%、
-    每实体 144.6 笔历史（全部数据集里最长）、r=0.917。
-    `category` 是具名消费类目（es_transportation / es_health…），h_dom 有作用面。
-    """
+    """Load BankSim and strip quotes from categorical fields."""
     path = os.path.join(DATA_DIR, 'banksim', 'bs140513_032310.csv')
     raw = pd.read_csv(path)
     strip = lambda s: s.astype(str).str.strip().str.strip("'")
@@ -835,13 +740,13 @@ def load_banksim(window: int) -> Dataset:
     raw['_ts'] = pd.to_numeric(raw['step'], errors='coerce').astype(float) * 86400.0
     raw = _middle_window(raw, '_ts', window)
     d = pd.DataFrame(dict(ts=raw['_ts'].astype(float), entity=strip(raw['customer']), counterparty=strip(raw['merchant']), amount=pd.to_numeric(raw['amount'], errors='coerce'), cat1=strip(raw['category']), cat2='AGE' + strip(raw['age']), cat3='G' + strip(raw['gender']), text='', label=raw['fraud'].astype(int)))
-    return _finalize('banksim', d, dict(source='BankSim（Kaggle ealaxi/banksim1）', task='零售银行卡消费欺诈', time_unit='unix 秒（step 为 1 天一步）', note=f'全量 {full_rows:,} 行、正类率 {full_rate:.6f}；4,112 客户 / 50 商户，每实体 144.6 笔；字段原始带引号，装载时已剥离'))
+    return _finalize('banksim', d, dict(source='BankSim(Kaggle ealaxi/banksim1)', task='Retail card-payment fraud', time_unit='Unix seconds derived from daily steps', note=f'Full dataset: {full_rows:,} rows; positive rate: {full_rate:.6f}; quotes stripped from categorical fields'))
 LOADERS = {'ibm-aml': load_ibm_aml, 'sparkov': load_sparkov, 'tabformer-cc': load_tabformer_cc, 'intent-tx-18k': load_intent_tx_18k, 'ieee-cis': load_ieee_cis, 'paysim': load_paysim, 'ibm-aml-li': load_ibm_aml_li, 'ibm-aml-medium': load_ibm_aml_medium, 'banksim': load_banksim}
 
 def load_dataset(name: str, window_rows: int=400000, use_cache: bool=True) -> Dataset:
-    """装载并缓存。缓存键含窗口行数，换窗口不会读到旧缓存。"""
+    """Load a dataset with a cache keyed by its window size."""
     if name not in LOADERS:
-        raise KeyError(f'未知数据集 {name!r}，可选：{sorted(LOADERS)}')
+        raise KeyError(f'Unknown dataset {name!r}; available: {sorted(LOADERS)}')
     cache_frame = os.path.join(CACHE_DIR, f'{name}_w{window_rows}.parquet')
     cache_meta = os.path.join(CACHE_DIR, f'{name}_w{window_rows}.meta.json')
     if use_cache and os.path.exists(cache_frame) and os.path.exists(cache_meta):
@@ -859,8 +764,7 @@ def load_dataset(name: str, window_rows: int=400000, use_cache: bool=True) -> Da
 
 @dataclass(frozen=True)
 class Splits:
-    """训练 / 选型 / 校准 / 测试。同一样本不得同时参与训练、候选选择与最终校准，
-    否则 3.4.1 的有限样本保证会因数据复用而失效（§3.2.1）。"""
+    """Disjoint training, tuning, calibration, and test indices."""
     train: np.ndarray
     tune: np.ndarray
     calibration: np.ndarray
@@ -875,38 +779,33 @@ class Splits:
         return {k: int(v.size) for k, v in self.as_dict().items()}
 
     def assert_valid(self, ts: np.ndarray) -> int:
-        """返回检查过的样本数。切分为空、重叠或时间倒挂都在这里拦下。"""
+        """Validate nonempty, disjoint splits and temporal ordering."""
         groups = self.as_dict()
         seen: set = set()
         total = 0
         for name, idx in groups.items():
             if idx.size == 0:
-                raise ValueError(f'切分 {name!r} 为空')
+                raise ValueError(f'Split {name!r} is empty')
             overlap = seen & set(idx.tolist())
             if overlap:
-                raise ValueError(f'样本在多个切分中重复出现：{sorted(overlap)[:5]}')
+                raise ValueError(f'Samples overlap between splits: {sorted(overlap)[:5]}')
             seen |= set(idx.tolist())
             total += int(idx.size)
         if self.mode == 'temporal':
             order = ['train', 'tune', 'calibration', 'test']
             for left, right in zip(order, order[1:]):
                 if float(ts[groups[left]].max()) >= float(ts[groups[right]].min()):
-                    raise ValueError(f'时间泄漏：max({left}) 必须严格早于 min({right})')
+                    raise ValueError(f'Temporal leakage: max({left}) must be strictly earlier than min({right})')
         return total
 
     def assert_label_coverage(self, y: np.ndarray) -> int:
-        """训练/调参/测试段须各有正类，校准段须有负类。
-
-        少了任何一项，指标不是"差"而是**没有定义**：AP 与 AUROC 在单一类别上无意义，
-        NP 校准在没有合法样本时无从取次序统计量。让它在这里报错，好过在结果表里留一列
-        看起来像 0 的 NaN。
-        """
+        """Require positives in train, tune, and test, and negatives in calibration."""
         for name in ('train', 'tune', 'test'):
             idx = getattr(self, name)
             if int(y[idx].sum()) == 0:
-                raise ValueError(f'切分 {name!r} 没有正类样本（n={idx.size}）：该窗口过小或正类沿时间高度聚集，请增大 window_rows 或改用别的窗口，而不是在这个切分上报指标')
+                raise ValueError(f'Split {name!r} has no positive samples (n={idx.size}); increase window_rows or select another window')
         if int((y[self.calibration] == 0).sum()) == 0:
-            raise ValueError('校准段没有合法样本，NP 校准无从取次序统计量')
+            raise ValueError('Calibration requires negative samples for order-statistic thresholds')
         return int(y.size)
 
 def make_splits(frame: pd.DataFrame, mode: str, ratios: List[float], group_column: Optional[str]=None, seed: int=2026) -> Splits:
@@ -918,7 +817,7 @@ def make_splits(frame: pd.DataFrame, mode: str, ratios: List[float], group_colum
         ts_sorted = ts[order]
         unique_ts = np.unique(ts_sorted)
         if unique_ts.size < 4:
-            raise ValueError(f'只有 {unique_ts.size} 个不同的时间戳，无法做四段时间切分')
+            raise ValueError(f'Only {unique_ts.size} distinct timestamps; four temporal segments are required')
         cum = np.searchsorted(ts_sorted, unique_ts, side='right')
         picks: List[int] = []
         for target in cuts * n:
@@ -927,13 +826,13 @@ def make_splits(frame: pd.DataFrame, mode: str, ratios: List[float], group_colum
                 candidate = max(candidate, picks[-1] + 1)
             picks.append(min(candidate, unique_ts.size - 2))
         if not picks[0] < picks[1] < picks[2]:
-            raise ValueError('时间戳打平过于严重，找不到三个互不相同的切分边界')
+            raise ValueError('Cannot find three distinct temporal split boundaries')
         b0, b1, b2 = (float(unique_ts[p]) for p in picks)
         parts = [np.flatnonzero(ts <= b0), np.flatnonzero((ts > b0) & (ts <= b1)), np.flatnonzero((ts > b1) & (ts <= b2)), np.flatnonzero(ts > b2)]
         splits = Splits(parts[0], parts[1], parts[2], parts[3], mode, (b0, b1, b2, float(ts.max())))
     elif mode == 'group':
         if group_column is None or group_column not in frame.columns:
-            raise ValueError(f'group 切分需要存在的 group_column，收到 {group_column!r}')
+            raise ValueError(f'Group splits require an existing group_column; received {group_column!r}')
         keys = frame[group_column].astype(str).to_numpy()
         uniq = np.array(sorted(set(keys.tolist())))
         rng = np.random.default_rng(seed)
@@ -947,7 +846,7 @@ def make_splits(frame: pd.DataFrame, mode: str, ratios: List[float], group_colum
         part_of = np.array([assign[k] for k in keys])
         splits = Splits(*[np.flatnonzero(part_of == i) for i in range(4)], mode=mode)
     else:
-        raise ValueError(f'未知切分模式 {mode!r}')
+        raise ValueError(f'Unknown split mode {mode!r}')
     splits.assert_valid(frame['ts'].to_numpy())
     return splits
 ''', _ROOT=_ROOT, _DATASET=_DATASET, _OUTPUT=_OUTPUT, _DATA=_DATA, _CONFIGS=_CONFIGS)
@@ -989,7 +888,7 @@ def _build_matrix(frame: pd.DataFrame, columns: List[str], category_maps: Dict[s
     return np.nan_to_num(matrix, nan=np.nan, posinf=np.nan, neginf=np.nan).astype(np.float32)
 
 def fit_base_features(frame: pd.DataFrame, train_idx: np.ndarray) -> BaseFeatureSpace:
-    """类别编码只在训练段拟合——这是 §3.2.1"同一样本不得同时参与训练与校准"的最低要求。"""
+    """Fit categorical encodings on the training segment only."""
     category_maps: Dict[str, Dict[str, int]] = {}
     for col in CATEGORICAL:
         values = sorted(set(frame[col].astype(str).to_numpy()[train_idx].tolist()))
@@ -1010,15 +909,15 @@ import numpy as np
 from scipy.stats import binom
 
 class CalibrationInfeasible(RuntimeError):
-    """样本量不足以认证目标 (α, δ)。不得降低置信要求或沿用旧阈值。"""
+    """Raised when the calibration sample cannot certify the requested risk budget."""
 
 def minimum_negative_samples(alpha: float, delta: float) -> int:
     if not 0.0 < alpha < 1.0 or not 0.0 < delta < 1.0:
-        raise ValueError('alpha 与 delta 必须落在 (0,1)')
+        raise ValueError('alpha and delta must be in (0,1)')
     return int(math.ceil(math.log(delta) / math.log1p(-alpha)))
 
 def violation_probability(n0: int, k: int, alpha: float) -> float:
-    """v(k) = Pr{Binomial(n0, 1−α) ≥ k}。"""
+    """Return the binomial-tail bound for an order-statistic threshold."""
     if k <= 0:
         return 1.0
     if k > n0:
@@ -1048,7 +947,7 @@ class NPOrderStatisticCalibrator:
 
     def __init__(self, alpha: float, delta: float) -> None:
         if not 0.0 < alpha < 1.0 or not 0.0 < delta < 1.0:
-            raise ValueError('alpha 与 delta 必须落在 (0,1)')
+            raise ValueError('alpha and delta must be in (0,1)')
         self.alpha, self.delta = (alpha, delta)
 
     @property
@@ -1059,9 +958,9 @@ class NPOrderStatisticCalibrator:
         scores = np.sort(np.asarray(negative_scores, dtype=np.float64))
         n0 = int(scores.size)
         if n0 < self.n_min:
-            raise CalibrationInfeasible(f'n_0={n0} < n_0,min={self.n_min}（α={self.alpha}, δ={self.delta}）：不存在可认证的阈值，该窗口须记为不可认证')
+            raise CalibrationInfeasible(f'n_0={n0} < n_0,min={self.n_min}(α={self.alpha}, δ={self.delta}): no certifiable threshold for this window')
         if violation_probability(n0, n0, self.alpha) > self.delta:
-            raise CalibrationInfeasible('没有任何次序统计量满足 v(k) ≤ delta')
+            raise CalibrationInfeasible('No order statistic satisfies v(k) <= delta')
         low, high = (1, n0)
         while low < high:
             mid = (low + high) // 2
@@ -1079,12 +978,7 @@ class NPOrderStatisticCalibrator:
         return CalibrationResult(method='np_order_statistic', status='CERTIFIED_WITH_TIES' if has_ties else 'CERTIFIED', alpha=self.alpha, delta=self.delta, n_negative=n0, n_min=self.n_min, k_star=k_star, threshold=threshold, violation_bound=violation_probability(n0, k_star, self.alpha), has_ties=has_ties, scorer_version=scorer_version, tie_admission_rate=tie_rate, n_tied_calibration=n_tied)
 
 class EmpiricalThresholdCalibrator:
-    """决策层消融对照：在校准集经验 ROC 上取 FPR ≤ α 的阈值。
-
-    §3.3 第二条指出这种做法没有回答总体 FPR 超过 α 的概率；Tong 等人的 1,000 次模拟中
-    朴素经验阈值只有约一半分类器满足总体 type-I error 上限。本类存在的唯一目的是把
-    这条缺陷在本课题数据上测出来，不是备选方案。
-    """
+    """Select an empirical FPR threshold without an NP finite-sample guarantee."""
 
     def __init__(self, alpha: float, delta: float) -> None:
         self.alpha, self.delta = (alpha, delta)
@@ -1093,7 +987,7 @@ class EmpiricalThresholdCalibrator:
         scores = np.sort(np.asarray(negative_scores, dtype=np.float64))
         n0 = int(scores.size)
         if n0 == 0:
-            raise CalibrationInfeasible('校准集没有合法样本')
+            raise CalibrationInfeasible('Calibration set has no negative samples')
         k = int(math.ceil((1.0 - self.alpha) * n0))
         k = min(max(k, 1), n0)
         threshold = float(scores[k - 1])
@@ -1112,19 +1006,15 @@ class CapacityResult:
     capacity: Optional[int]
 
 class CapacityGate:
-    """N_alert,t ≤ B_t。只能减少告警，不能反过来放宽 FPR 约束（§3.1.3 / §4.4）。"""
+    """Limit alert counts by removing alerts after thresholding."""
 
     def __init__(self, capacity: Optional[int]) -> None:
         if capacity is not None and capacity < 0:
-            raise ValueError('capacity 必须非负或 None')
+            raise ValueError('capacity must be nonnegative or None')
         self.capacity = capacity
 
     def apply(self, scores: Sequence[float], threshold: float, tie_admission_rate: float=0.0) -> CapacityResult:
-        """`tie_admission_rate` 是校准段定出的并列放行比例 γ（见 NPOrderStatisticCalibrator）。
-
-        γ=0 时退化为原来的严格大于。γ>0 时按**原始行序**取并列块的前 ⌊γ·n_tie⌋ 个一并
-        放行——顺序规则与标签无关且可复现，这是它能被写进方法而不是当作实现细节的前提。
-        """
+        """Admit the calibrated fraction of threshold ties in original row order."""
         s = np.asarray(scores, dtype=np.float64)
         candidate_idx = np.flatnonzero(s > threshold)
         if tie_admission_rate > 0.0:
@@ -1141,26 +1031,14 @@ class CapacityGate:
         return CapacityResult(alerts, int(candidate_idx.size), int(alerts.sum()), bool(alerts.sum() < candidate_idx.size), self.capacity)
 
 class FixedPolicyCalibrator:
-    """底座系统写死的 0.40 告警线——即"根本不做校准"。
-
-    加这一条是为了让约束层能被**真正去掉**而不只是被替换。其余三条 how 的消融都能
-    整层拿掉（语义层、图层不给特征即可），约束层不行：总得有个东西决定多高算告警，
-    "没有阈值"只能退化成全判正常或全判欺诈，不是有意义的对照。因此这一层的"去掉"
-    定义为退回底座 `kirtis111/agentic-ai-fraud-detection` 的 Decision Agent：
-    两级固定阈值 0.70 / 0.40（底座 README 原文 "score > 0.7 → BLOCK / 0.4–0.7 →
-    INVESTIGATE"），取其中较低的 0.40 作为是否告警的分界。
-
-    它与 `EmpiricalThresholdCalibrator` 的区别是本质的——后者仍然看数据（取校准段
-    负样本的 1-α 分位），只是不给有限样本保证；这一条连校准段都不看，α 与 δ 完全
-    不起作用。因此它才是"去掉约束层"，经验阈值只是"换一种校准"。
-    """
+    """Use a fixed alert threshold without calibration."""
 
     def __init__(self, alpha: float, delta: float, investigate_at: float=0.4) -> None:
         self.alpha, self.delta, self.investigate_at = (alpha, delta, investigate_at)
 
     def fit(self, negative_scores: Sequence[float], scorer_version: int) -> CalibrationResult:
         n0 = int(np.asarray(negative_scores).size)
-        return CalibrationResult(method='fixed_policy', status='FIXED_POLICY(无有限样本保证)', alpha=self.alpha, delta=self.delta, n_negative=n0, n_min=minimum_negative_samples(self.alpha, self.delta), k_star=None, threshold=float(self.investigate_at), violation_bound=None, has_ties=False, scorer_version=scorer_version)
+        return CalibrationResult(method='fixed_policy', status='FIXED_POLICY(no finite-sample guarantee)', alpha=self.alpha, delta=self.delta, n_negative=n0, n_min=minimum_negative_samples(self.alpha, self.delta), k_star=None, threshold=float(self.investigate_at), violation_bound=None, has_ties=False, scorer_version=scorer_version)
 
 def make_calibrator(method: str, alpha: float, delta: float):
     if method == 'np':
@@ -1169,7 +1047,7 @@ def make_calibrator(method: str, alpha: float, delta: float):
         return EmpiricalThresholdCalibrator(alpha, delta)
     if method == 'fixed':
         return FixedPolicyCalibrator(alpha, delta)
-    raise ValueError(f'未知校准方法 {method!r}')
+    raise ValueError(f'Unknown calibration method {method!r}')
 ''', _ROOT=_ROOT, _DATASET=_DATASET, _OUTPUT=_OUTPUT, _DATA=_DATA, _CONFIGS=_CONFIGS)
 
 # -------------------- how123.context --------------------
@@ -1198,7 +1076,7 @@ class ContextArtifacts:
     n_window_checked: int = 0
 
 def build_history_index(entity_code: np.ndarray, ts: np.ndarray, k: int) -> np.ndarray:
-    """每行取同实体最近 k 条历史的原始行号；不足则为 -1。O(N·k)，全向量化。"""
+    """Retrieve up to k previous same-entity row indices, padding with -1."""
     order = np.lexsort((ts, entity_code))
     ent_sorted = entity_code[order]
     n = order.size
@@ -1216,7 +1094,7 @@ def build_history_index(entity_code: np.ndarray, ts: np.ndarray, k: int) -> np.n
     return out
 
 def build_random_history_index(ts: np.ndarray, k: int, seed: int) -> np.ndarray:
-    """负对照：只取过去、但随机跨实体。样本量与因果方向保持不变。"""
+    """Sample strictly past cross-entity records as a history control."""
     order = np.argsort(ts, kind='mergesort')
     n = order.size
     rng = np.random.default_rng(seed)
@@ -1230,7 +1108,7 @@ def build_random_history_index(ts: np.ndarray, k: int, seed: int) -> np.ndarray:
     return out
 
 class HistoryAdmission:
-    """不可违反的硬约束：因果方向、回看窗口、字段准入、度量兼容与业务禁配。"""
+    """Enforce temporal, field-availability, and business-compatibility constraints."""
     REASONS = ('no_history_slot', 'outside_observation_window', 'missing_required_field', 'incompatible_measurement', 'blocked_business_pair')
 
     def __init__(self, cfg: Dict[str, Any]) -> None:
@@ -1298,7 +1176,7 @@ class NAGContextModel(nn.Module):
         self.head = nn.Linear(len(AGG_NAMES) + out_dim, 1)
 
     def soft_weights(self, cur: torch.Tensor, hist: torch.Tensor) -> torch.Tensor:
-        """S_t w + b 后过 sigmoid。cur:[B,F] hist:[B,K,F]。"""
+        """Apply sigmoid relation gates to current [B,F] and historical [B,K,F] fields."""
         if self.mode == 'hard' or self.n_fields == 0:
             return torch.ones(hist.shape[0], hist.shape[1], device=hist.device)
         sims = []
@@ -1338,7 +1216,7 @@ class NAGContextModel(nn.Module):
 
 def build_context(frame: pd.DataFrame, train_idx: np.ndarray, labels: np.ndarray, gamma: SemanticSpec, cfg: Dict[str, Any], seed: int=2026, auditor=None) -> ContextArtifacts:
     if not bool(cfg.get('enabled', True)):
-        return ContextArtifacts(np.zeros((len(frame), 0), dtype=np.float32), [], False, str(cfg.get('disabled_reason', '配置关闭')), str(cfg.get('mode', 'soft')), 'none')
+        return ContextArtifacts(np.zeros((len(frame), 0), dtype=np.float32), [], False, str(cfg.get('disabled_reason', 'Disabled by configuration')), str(cfg.get('mode', 'soft')), 'none')
     k = int(cfg['top_k'])
     mode = str(cfg.get('mode', 'soft'))
     control = str(cfg.get('negative_control', 'none'))
@@ -1352,7 +1230,7 @@ def build_context(frame: pd.DataFrame, train_idx: np.ndarray, labels: np.ndarray
     mask_bool, counts = admission.evaluate(frame, hist)
     guard_checked = TemporalAvailabilityGuard.assert_history_window(ts, ts[np.clip(hist, 0, None)], mask_bool, float(cfg['window_seconds']))
     if auditor is not None:
-        auditor.record('契约二·上文回看窗口 0<τt−τi≤W', guard_checked, True, f"采纳 {counts['admitted']} / 候选槽 {counts['slots_total']}")
+        auditor.record('History admission: 0 < lag <= W', guard_checked, True, f"Admitted {counts['admitted']} / candidate slots {counts['slots_total']}")
     safe = np.clip(hist, 0, None)
     amount = pd.to_numeric(frame['amount'], errors='coerce').to_numpy(dtype=np.float64)
     amount = np.nan_to_num(amount, nan=0.0)
@@ -1383,13 +1261,13 @@ def build_context(frame: pd.DataFrame, train_idx: np.ndarray, labels: np.ndarray
             outputs.append(features.numpy())
     matrix = np.vstack(outputs).astype(np.float32)
     names = list(AGG_NAMES) + [f'ctx_proj_{i}' for i in range(int(cfg.get('output_dim', 8)))]
-    reason = f"mode={mode}, K={k}, W={cfg['window_seconds']}s, 关系字段={relation_fields or '无'}"
+    reason = f"mode={mode}, K={k}, W={cfg['window_seconds']}s, relation fields={relation_fields or 'none'}"
     if control != 'none':
-        reason += f'; 负对照={control}'
+        reason += f'; negative control={control}'
     return ContextArtifacts(matrix, names, True, reason, mode, control, admission=counts, training=training_log, n_window_checked=guard_checked)
 
 def _fit(model: NAGContextModel, tensors: Dict[str, torch.Tensor], train_idx: np.ndarray, labels: np.ndarray, cfg: Dict[str, Any], seed: int) -> Dict[str, Any]:
-    """只在训练段学 w 与类别嵌入。校准段与测试段一律只做前向。"""
+    """Learn relation parameters on training data only."""
     epochs = int(cfg.get('epochs', 3))
     batch = int(cfg.get('batch_size', 4096))
     y = torch.from_numpy(labels.astype(np.float32))
@@ -1446,7 +1324,7 @@ def _tokenize(text: str) -> List[str]:
 
 @dataclass
 class SemanticArtifacts:
-    """产出与审计证据分开存放：向量给评分器，其余给 §4.7 第二条的可核查性。"""
+    """Semantic features and their separate audit metadata."""
     matrix: np.ndarray
     enabled: bool
     reason: str
@@ -1471,7 +1349,7 @@ class DomainSemanticEncoder:
         self._excluded: List[str] = []
 
     def _visible_columns(self, frame: pd.DataFrame, decision_offset: float=0.0) -> Tuple[List[str], List[str]]:
-        """按 ω_j 整列判定可见性。决策时点取事件时点本身（在线场景的最严格取法）。"""
+        """Select columns available at the transaction decision time."""
         candidates = [c for c in frame.columns if c in self.gamma.fields and c != 'label']
         visible, excluded = ([], [])
         for name in candidates:
@@ -1507,7 +1385,7 @@ class DomainSemanticEncoder:
         return tokens
 
     def fit(self, frame: pd.DataFrame, train_idx: np.ndarray) -> None:
-        """分箱边界与取值词表只在训练段拟合。"""
+        """Fit numeric bins and categorical vocabularies on training data."""
         visible, excluded = self._visible_columns(frame)
         self._columns, self._excluded = (visible, excluded)
         constant = np.zeros(self.dim, dtype=np.float64)
@@ -1557,10 +1435,7 @@ class DomainSemanticEncoder:
         return np.array([index.get(k, -1) for k in keys], dtype=np.int64)
 
     def _extend_table(self, name: str, unseen: Sequence[str]) -> None:
-        """训练期未见的类别取值：现场补进查表，而不是静默丢弃这一字段的贡献。
-
-        丢弃会让测试段的 h_dom 与训练段不同分布——那是实现缺陷伪装成分布漂移。
-        """
+        """Encode unseen categorical values in the existing hash space."""
         index, table = self._value_tables[name]
         spec = self.gamma.field(name)
         rows = np.zeros((len(unseen), self.dim), dtype=np.float32)
@@ -1571,7 +1446,7 @@ class DomainSemanticEncoder:
 
     def transform(self, frame: pd.DataFrame) -> np.ndarray:
         if self._constant is None:
-            raise RuntimeError('先调用 fit 再 transform')
+            raise RuntimeError('Call fit before transform')
         n = len(frame)
         out = np.repeat(self._constant[None, :], n, axis=0)
         for name in self._columns:
@@ -1595,7 +1470,7 @@ class DomainSemanticEncoder:
         return (out / np.maximum(norms, 1e-08)).astype(np.float32)
 
     def serialize_row(self, frame: pd.DataFrame, row: int) -> str:
-        """人类可读的 r_t^Γ。只用于审计输出与单元测试对账，不进入训练路径。"""
+        """Serialize a row for audit output and reference checks."""
         record = frame.iloc[row]
         if self.gamma.is_empty_spec():
             pairs = [f'{name}={record[name]}' for name in self._columns]
@@ -1613,7 +1488,7 @@ class DomainSemanticEncoder:
         return ' '.join(units)
 
     def encode_row_reference(self, frame: pd.DataFrame, row: int) -> np.ndarray:
-        """逐行 token 哈希的参考路径，用于验证向量化实现没有漂移。"""
+        """Compute reference row-wise token hashes for encoder validation."""
         record = frame.iloc[row]
         vector = np.zeros(self.dim, dtype=np.float64)
         for name in self._columns:
@@ -1636,21 +1511,16 @@ class DomainSemanticEncoder:
         return (vector / max(norm, 1e-08)).astype(np.float32)
 
 def build_semantic(frame: pd.DataFrame, train_idx: np.ndarray, gamma: SemanticSpec, cfg: Dict[str, Any]) -> SemanticArtifacts:
-    """按 §4.5 的模块级开关决定是否启用：1.4.1 只在数据含原始文本时启用。
-
-    这不是工程上的方便，而是本课题实测已确定的结论——在无文本数据上 Γ 序列化是负增益
-    （AP 提升由 81.82 降到 26.90、由 221.05 降到 184.36），因为它只是把已有的类别信息
-    重新编码一遍，多出的分量是噪声。因此 how123 在无文本场景下的正确形态是三模块而非四模块。
-    """
+    """Build semantic features according to the configured activation mode."""
     setting = str(cfg.get('enabled', 'auto')).lower()
     has_text = bool((frame['text'].astype(str).str.len() > 0).any()) if 'text' in frame.columns else False
     if setting == 'false':
-        enabled, reason = (False, '配置显式关闭')
+        enabled, reason = (False, 'Explicitly disabled')
     elif setting == 'true':
-        enabled, reason = (True, '配置显式开启（无文本时这是负增益复现臂，不是推荐配置）')
+        enabled, reason = (True, 'Explicitly enabled')
     else:
         enabled = has_text
-        reason = 'auto：检测到原始文本' if has_text else 'auto：无原始文本，按 §4.5 退回三模块形态'
+        reason = 'Raw text detected' if has_text else 'No raw text; semantic features disabled in text-only mode'
     encoder = DomainSemanticEncoder(gamma, cfg)
     visible, excluded = encoder._visible_columns(frame)
     if not enabled:
@@ -1677,12 +1547,11 @@ from .contracts import ContractViolation, PatternEntry, SemanticSpec
 GRAPH_FEATURE_NAMES = ('g_zeta', 'g_concentration', 'g_max_path_len', 'g_subgraph_edges', 'g_signal_age_buckets')
 
 class CountMinSketch:
-    """常数内存计数。只会高估，MIDAS 定理 1 正是利用这一单向性构造上界；
-    因此它的保证只覆盖误报，对漏报没有任何承诺。"""
+    """Fixed-memory counts with nonnegative updates and one-sided overestimation."""
 
     def __init__(self, width: int=4096, depth: int=5) -> None:
         if width <= 0 or depth <= 0:
-            raise ValueError('CMS 的 width 与 depth 必须为正')
+            raise ValueError('CMS width and depth must be positive')
         self.width, self.depth = (width, depth)
         self.table = np.zeros((depth, width), dtype=np.float64)
         self._rows_cache: Dict[int, np.ndarray] = {}
@@ -1697,7 +1566,7 @@ class CountMinSketch:
 
     def add(self, key: int, count: float=1.0) -> None:
         if count < 0:
-            raise ValueError('CMS 不支持负增量')
+            raise ValueError('CMS does not support negative updates')
         self.table[self._depth_index, self._rows(key)] += count
 
     def estimate(self, key: int) -> float:
@@ -1711,9 +1580,9 @@ def midas_statistic(current: np.ndarray, cumulative: np.ndarray, t: int) -> np.n
     return (current - expected) ** 2 * t ** 2 / denom
 
 def chi_square_threshold(epsilon_t: float) -> float:
-    """χ²_{1−ε_t/2}(df=1)。"""
+    """Return the chi-squared burst-screening threshold."""
     if not 0.0 < epsilon_t < 1.0:
-        raise ValueError('epsilon_t 必须落在 (0,1)')
+        raise ValueError('epsilon_t must be in (0,1)')
     return float(chi2.isf(epsilon_t / 2.0, 1))
 
 def vectorize_paths(paths: Sequence[Sequence[Tuple[int, int, int]]], dim: int, node_names: Dict[int, str], relation_names: Dict[int, str]) -> np.ndarray:
@@ -1729,14 +1598,7 @@ def vectorize_paths(paths: Sequence[Sequence[Tuple[int, int, int]]], dim: int, n
     return out
 
 def path_attention(vectors: np.ndarray) -> np.ndarray:
-    """Π = softmax( (ZW_Q)(ZW_K)ᵀ / √d )，取 W_Q = W_K = cI。
-
-    c 不是可省的常数。路径向量是单位范数，直接取 c = 1 会让 logits 落在
-    [−1/√d, 1/√d]（d = 32 时约 ±0.18），softmax 之后 Π 恒为近似均匀，
-    ϱ 无论数据如何都稳定在 1e-4 量级——那不是"数据里没有长程关系"，
-    而是尺度选错把这个量测没了。这里按 logits 的标准差标定 c，
-    使 Π 只反映路径相似度的**相对**结构，与向量范数和维度无关。
-    """
+    """Compute path similarities using scaled identity projections, not learned attention."""
     if vectors.shape[0] == 0:
         return np.zeros((0, 0))
     logits = vectors @ vectors.T / math.sqrt(max(1, vectors.shape[1]))
@@ -1748,7 +1610,7 @@ def path_attention(vectors: np.ndarray) -> np.ndarray:
     return weights / weights.sum(axis=1, keepdims=True)
 
 def attention_concentration(attention: np.ndarray) -> float:
-    """ϱ_attn(Π) = 1 − Ent(Π)/log K，§2.4.8 的原式。行近似均匀 →0，集中在少数路径 →1。"""
+    """Measure concentration as normalized attention-entropy reduction."""
     k = attention.shape[0]
     if k <= 1:
         return 0.0
@@ -1756,26 +1618,7 @@ def attention_concentration(attention: np.ndarray) -> float:
     return float(np.clip(1.0 - entropy / math.log(k), 0.0, 1.0))
 
 def path_overlap_concentration(paths: Sequence[Sequence[Tuple[int, int, int]]]) -> float:
-    """ϱ_overlap = 1 − |∪ 边| / Σ_k |p_k|，即 K 条采样路径彼此复用同一批边的程度。
-
-    ---------------------------------------------------------------------------
-    这是一处必须声明的偏离，不是对 §2.4.8 原式的复现。
-    ---------------------------------------------------------------------------
-    §2.4.8 用注意力熵定义 ϱ，其**前提是 Π 是学到的相关性矩阵**——那时"某几条路径
-    被反复赋予高权重"才等价于"存在协同结构"。本实现取恒等投影（训练投影需要路径级
-    监督，属 §4.5 的可替换点），Π 退化成相似度矩阵，此时熵的方向与"路径互相印证"
-    正好相反：多条路径共享同一段资金链 ⇒ 向量彼此相似 ⇒ Π 每行近似均匀 ⇒ 熵最大 ⇒
-    ϱ_attn → 0。照搬原式会把最该确认的结构判成"无结构"。
-
-    ϱ_overlap 保留 §2.4.8 要求的三条退化语义而不依赖任何投影：
-      · 采样路径各走各的（无协同结构）→ 并集 ≈ 总长 → ϱ → 0
-      · 采样路径反复走同一小撮边（跑分链、过手链）→ 并集 ≪ 总长 → ϱ → 1 − 1/K
-      · 单条路径 → 0（没有"互相"印证可言）
-    取值域 [0, 1−1/K]，K 为采样路径条数。
-
-    ϱ_attn 仍然照算并写进 stats（`mean_rho_attention`），因为"它在恒等投影下恒为
-    1e-4 量级"本身就是上述论证的实测证据，应当留在结果里供复核，而不是删掉。
-    """
+    """Measure edge reuse as one minus unique edges divided by total path length."""
     total = sum((len(path) for path in paths))
     if total <= 1:
         return 0.0
@@ -1783,11 +1626,7 @@ def path_overlap_concentration(paths: Sequence[Sequence[Tuple[int, int, int]]]) 
     return float(np.clip(1.0 - distinct / total, 0.0, 1.0))
 
 def edge_usage_ranking(paths: Sequence[Sequence[Tuple[int, int, int]]]) -> np.ndarray:
-    """按"路径上的边被多少条路径共用"给路径打分，用于选出合并成最小子图的那几条。
-
-    §2.4.3 第三步用 Π 的列贡献做这件事；恒等投影下列贡献近似相等（见 path_attention），
-    因此改用边复用计数——它选出的正是被多条路径共同印证的那一段，与该步的意图一致。
-    """
+    """Rank paths by the reuse counts of their edges."""
     counts: Dict[Tuple[int, int, int], int] = defaultdict(int)
     for path in paths:
         for edge in set(path):
@@ -1795,11 +1634,7 @@ def edge_usage_ranking(paths: Sequence[Sequence[Tuple[int, int, int]]]) -> np.nd
     return np.array([float(np.mean([counts[e] for e in path])) if path else 0.0 for path in paths])
 
 def pattern_signature(nodes: Sequence[str], relations: Sequence[Tuple[str, str, str]], times: Sequence[float], attributes: Sequence[str], gap_bin_seconds: float=3600.0) -> str:
-    """ID 无关的结构—时序签名，用于回答"这个模式族在训练期出现过吗"。
-
-    刻意保守且可替换：度数谱 + 关系多重集 + 时间间隔分箱 + 属性 schema。
-    真正的模式族判定应在调参段上验证图编辑距离与属性距离阈值，此处不冒充那一步。
-    """
+    """Build an entity-ID-independent structural and temporal signature."""
     in_deg: Dict[str, int] = defaultdict(int)
     out_deg: Dict[str, int] = defaultdict(int)
     rels: List[str] = []
@@ -1814,8 +1649,7 @@ def pattern_signature(nodes: Sequence[str], relations: Sequence[Tuple[str, str, 
     return hashlib.blake2b(payload.encode('utf-8'), digest_size=12).hexdigest()
 
 class _Adjacency:
-    """按时间片增量追加。邻接表在任意时刻只含 τ_e ≤ t 的边——契约二不是靠一句断言
-    维持的，而是数据结构本身不可能包含未来边。"""
+    """Append edges incrementally while maintaining an as-of graph view."""
 
     def __init__(self) -> None:
         self.out: Dict[int, List[Tuple[int, int, float]]] = defaultdict(list)
@@ -1829,8 +1663,7 @@ class _Adjacency:
             self.max_ts = ts
 
 def _sample_paths(adj: _Adjacency, seeds: Tuple[int, int], k: int, max_hops: int, rng: np.random.Generator) -> List[List[Tuple[int, int, int]]]:
-    """从种子两端出发采样变长有类型路径。路径长度由采样过程决定、不受层数限制——
-    这正是路径聚合相对 L 层消息传递的差别（后者至多覆盖 L 跳且被逐层平滑抹平）。"""
+    """Sample typed paths from both seed endpoints within the configured hop limit."""
     paths: List[List[Tuple[int, int, int]]] = []
     for i in range(k):
         node = seeds[i % 2]
@@ -1854,16 +1687,7 @@ def _sample_paths(adj: _Adjacency, seeds: Tuple[int, int], k: int, max_hops: int
 
 @dataclass(frozen=True)
 class GraphConfirmation:
-    """一次结构确认：时间片、写进模式库的节点、以及构成证据向量所需的原始量。
-
-    发现（第一、二级）与派发（写模式库、后续时间片查库）在这里被拆成两件事。
-    拆开的直接好处是 ϱ 的两种用法都可以零成本重放：确认日志既不含阈值也不含 ζ 的取法，
-    换任一个只需重跑派发。§2.4.3 第二步要求阈值在调参段上选，那就必须能便宜地把
-    多个候选都跑一遍。
-
-    **存 burst 而不是存 ζ**：ζ = X̃²·ϱ 还是 ζ = X̃² 是 `zeta_mode` 决定的，
-    存成品会把这个选择锁死在发现阶段。
-    """
+    """Store discovered evidence before selecting emission thresholds and weights."""
     bucket: int
     targets: Tuple[int, ...]
     burst: float
@@ -1873,30 +1697,20 @@ class GraphConfirmation:
     novelty: str = 'UNKNOWN'
 
     def values(self, zeta_mode: str) -> np.ndarray:
-        """按给定的 ζ 取法组装证据向量 [ζ, ϱ, 最长路径, 最小子图边数]。"""
+        """Build graph-evidence values using the selected intensity mode."""
         zeta = self.burst * self.rho if zeta_mode == 'product' else self.burst
         return np.array([zeta, self.rho, self.max_path_len, self.n_subgraph_edges], dtype=np.float32)
 
 @dataclass
 class GraphEmissionContext:
-    """派发所需的全部输入。与 ϱ 阈值无关，因此可以复用。"""
+    """Inputs reused when replaying graph-evidence emission."""
     n_rows: int
     bucket_rows: List[Tuple[int, np.ndarray]]
     endpoint_nodes: List[np.ndarray]
     horizon: int
 
 def emit_graph_features(ctx: GraphEmissionContext, confirmations: Sequence[GraphConfirmation], threshold: float, zeta_mode: str='product') -> Tuple[np.ndarray, int]:
-    """按给定 ϱ 阈值与 ζ 取法重放派发。返回 (g_t 矩阵, 通过阈值的确认数)。
-
-    ϱ 在本方法里有**两重身份**，这个函数把它们分开：
-      · 门 —— `threshold`，决定哪些种子进模式库
-      · 权重 —— `zeta_mode`，决定 ζ 是 X̃²·ϱ（product）还是 X̃²（burst_only）
-    实测两重在不同数据上分别失效（Sparkov 上权重有害、TabFormer 上门有益），
-    绑在一起时没有任何数据集能同时拿到两边的好处，故拆开各自在调参段上选。
-
-    因果方向由循环顺序保证：片 b 的交易只看 node_state，而 node_state 此刻只含
-    **早于 b** 的确认结果——本片的确认在派发之后才写入。
-    """
+    """Emit past-bucket evidence using separate concentration gates and intensity weights."""
     features = np.zeros((ctx.n_rows, len(GRAPH_FEATURE_NAMES)), dtype=np.float32)
     by_bucket: Dict[int, List[Tuple[np.ndarray, GraphConfirmation]]] = defaultdict(list)
     n_passed = 0
@@ -1942,7 +1756,7 @@ class GraphArtifacts:
     _describe: Optional[Any] = None
 
     def resolve_threshold(self, setting: Any, quantile: float, minimum_seeds: int, fallback: float) -> Tuple[float, Dict[str, Any]]:
-        """把 `rho_min` 的配置取值解成一个具体阈值，并给出可复核的定标记录。"""
+        """Resolve the concentration threshold and record its training calibration."""
         if not (isinstance(setting, str) and setting.lower() == 'auto'):
             return (float(setting), {'mode': 'fixed', 'threshold': float(setting)})
         samples = self.rho_samples_train
@@ -1953,7 +1767,7 @@ class GraphArtifacts:
         return (threshold, {'mode': mode, 'quantile': quantile, 'n_train_seeds': len(samples), 'min_required_seeds': minimum_seeds, 'threshold': threshold, 'train_rho_quantiles': {str(q): float(np.quantile(samples, q)) if samples else None for q in (0.1, 0.25, 0.5, 0.75, 0.9)}})
 
     def with_threshold(self, threshold: float, calibration: Dict[str, Any], zeta_mode: str='product') -> 'GraphArtifacts':
-        """按新阈值与新的 ζ 取法重放派发，返回一份新的产物。发现阶段完全不重跑。"""
+        """Replay emission at a new threshold without repeating graph discovery."""
         if not self.enabled or self.emission is None:
             return self
         matrix, n_passed = emit_graph_features(self.emission, self.confirmations, threshold, zeta_mode)
@@ -1978,8 +1792,7 @@ class GraphArtifacts:
         return GraphArtifacts(matrix, list(self.feature_names), True, reason, stats, kept, self.confirmations, self.emission, self.rho_samples_train, self._describe)
 
 def _pattern_attributes(frame: pd.DataFrame, rows: np.ndarray, gamma: SemanticSpec) -> Dict[str, Any]:
-    """A 分量由 Γ 而非图模块产出：1.4.1 的 ω_j 必须对图属性同样生效——
-    判定之后才产生的属性不得进入模式条目（§2.4.8 输出表脚注）。"""
+    """Extract pattern attributes allowed by the shared field schema."""
     attrs: Dict[str, Any] = {'n_transactions': int(rows.size)}
     for name in ('amount', 'cat1', 'cat2', 'cat3'):
         if name not in frame.columns or name not in gamma.fields:
@@ -1999,20 +1812,16 @@ def _pattern_attributes(frame: pd.DataFrame, rows: np.ndarray, gamma: SemanticSp
     return attrs
 
 def build_graph(frame: pd.DataFrame, train_idx: np.ndarray, gamma: SemanticSpec, cfg: Dict[str, Any], seed: int=2026, auditor=None) -> GraphArtifacts:
-    """跑一遍发现流程（触发 → 展开 → 确认），产出确认日志，再按解析出的 ϱ 阈值派发一次。
-
-    确认阶段不施加 ϱ 阈值：所有展开成功的种子都记进确认日志并附带自己的 ϱ。
-    阈值只在派发时起作用，因此换阈值不必重跑发现——`with_threshold` 即可。
-    """
+    """Discover candidate patterns and emit features at the configured threshold."""
     if not bool(cfg.get('enabled', True)):
-        return GraphArtifacts(np.zeros((len(frame), 0), dtype=np.float32), [], False, str(cfg.get('disabled_reason', '配置关闭')))
+        return GraphArtifacts(np.zeros((len(frame), 0), dtype=np.float32), [], False, str(cfg.get('disabled_reason', 'Disabled by configuration')))
     n = len(frame)
     ts = frame['ts'].to_numpy(dtype=np.float64)
     bucket_seconds = float(cfg['bucket_seconds'])
     bucket = np.floor((ts - ts.min()) / bucket_seconds).astype(np.int64)
     streams = list(cfg.get('streams') or [])
     if not streams:
-        raise ValueError('graph.streams 不得为空——图层没有边流就没有检测对象')
+        raise ValueError('graph.streams must contain at least one edge stream')
     node_id: Dict[str, int] = {}
     node_names: Dict[int, str] = {}
     relation_names: Dict[int, str] = {}
@@ -2062,7 +1871,7 @@ def build_graph(frame: pd.DataFrame, train_idx: np.ndarray, gamma: SemanticSpec,
     signal_scope = str(cfg.get('signal_scope', 'seed'))
     rho_estimator = str(cfg.get('rho_estimator', 'overlap'))
     if rho_estimator not in ('overlap', 'attention'):
-        raise ValueError('graph.rho_estimator 只能是 overlap 或 attention')
+        raise ValueError('graph.rho_estimator must be overlap or attention')
     rho_attn_sum, rho_attn_count = (0.0, 0)
     last_train_bucket = int(bucket[train_idx].max()) if train_idx.size else int(bucket.max())
     rho_samples: List[float] = []
@@ -2129,7 +1938,7 @@ def build_graph(frame: pd.DataFrame, train_idx: np.ndarray, gamma: SemanticSpec,
                 if add_reverse:
                     adjacency.add(int(dst[j]), int(src[j]), reverse_rel[rel], edge_ts)
         if adjacency.max_ts > decision_time:
-            raise ContractViolation(f'邻接表含未来边：max(τ_e)={adjacency.max_ts} > t={decision_time}')
+            raise ContractViolation(f'Future edge in adjacency: max(edge_time)={adjacency.max_ts} > t={decision_time}')
         for seed_info in seeds:
             stats['n_expanded'] += 1
             paths = _sample_paths(adjacency, seed_info['pair'], k_paths, max_hops, rng)
@@ -2185,7 +1994,7 @@ def build_graph(frame: pd.DataFrame, train_idx: np.ndarray, gamma: SemanticSpec,
     stats['novelty'] = dict(stats['novelty'])
 
     def describe(threshold: float, calibration: Dict[str, Any]) -> str:
-        return f"streams={[s.get('relation') for s in streams]}, bucket={bucket_seconds:g}s, ε={epsilon}, trigger={('on' if use_trigger else 'off(全实体对展开)')}, ϱ_{rho_estimator}={('forced=1.0' if force_rho_one else f'≥{threshold:.4f}')}（{calibration['mode']}）, 证据有效期={horizon}片"
+        return f"streams={[s.get('relation') for s in streams]}, bucket={bucket_seconds:g}s, ε={epsilon}, trigger={('on' if use_trigger else 'off(expand all entity pairs)')}, ϱ_{rho_estimator}={('forced=1.0' if force_rho_one else f'≥{threshold:.4f}')}({calibration['mode']}), evidence horizon={horizon} buckets"
     emission = GraphEmissionContext(n_rows=n, bucket_rows=bucket_rows, endpoint_nodes=[arr for s_index in range(len(streams)) for arr in (edge_src[s_index], edge_dst[s_index])], horizon=horizon)
     base = GraphArtifacts(np.zeros((n, len(GRAPH_FEATURE_NAMES)), dtype=np.float32), list(GRAPH_FEATURE_NAMES), True, '', stats, patterns, confirmations, emission, rho_samples, describe)
     quantile_setting = cfg.get('rho_quantile', 0.75)
@@ -2200,9 +2009,9 @@ def build_graph(frame: pd.DataFrame, train_idx: np.ndarray, gamma: SemanticSpec,
         zeta_setting = 'product'
     result = base.with_threshold(threshold, calibration, zeta_setting)
     if auditor is not None:
-        auditor.record('契约二·图只在 E_t 上计算', adjacency.n_edges, True, f"{stats['n_buckets']} 个时间片逐片增量追加；证据经模式库在确认后 1..{horizon} 片内派发")
-        auditor.record('ϱ 阈值定标只用训练期', int(calibration.get('n_train_seeds', 0)), calibration['mode'] != 'auto_unavailable', f"mode={calibration['mode']}, 阈值={threshold:.4f}" + ('（训练期触发种子不足，落到兜底阈值）' if calibration['mode'] == 'auto_unavailable' else ''))
-        auditor.record('单调过滤 S_t^out ⊆ S_t（发现阶段）', stats['n_expanded'], True, f"触发 {stats['n_triggered']} → 展开 {stats['n_expanded']}；结构确认数取决于最终选定的 ϱ 阈值，见「ϱ 阈值选定后的确认规模」一项")
+        auditor.record('Graph queries use only available edges', adjacency.n_edges, True, f"{stats['n_buckets']} buckets appended incrementally; evidence is available after confirmation in buckets 1..{horizon}")
+        auditor.record('Concentration thresholds use training data only', int(calibration.get('n_train_seeds', 0)), calibration['mode'] != 'auto_unavailable', f"mode={calibration['mode']}, threshold={threshold:.4f}" + (' (insufficient training seeds; using fallback threshold)' if calibration['mode'] == 'auto_unavailable' else ''))
+        auditor.record('Discovery filtering preserves a subset of candidates', stats['n_expanded'], True, f"Triggered {stats['n_triggered']} -> expanded {stats['n_expanded']}; confirmation count depends on the selected concentration threshold")
     return result
 ''', _ROOT=_ROOT, _DATASET=_DATASET, _OUTPUT=_OUTPUT, _DATA=_DATA, _CONFIGS=_CONFIGS)
 
@@ -2223,7 +2032,7 @@ class DetectorArtifacts:
     global_importance: List[Tuple[str, float]] = field(default_factory=list)
 
 class FusedDetector:
-    """XGBoost 评分器。早停只用调参段，校准段与测试段在冻结前完全不接触。"""
+    """XGBoost fusion scorer with early stopping on the tuning segment."""
 
     def __init__(self, cfg: Dict[str, Any], feature_names: Sequence[str], seed: int=2026) -> None:
         self.cfg = cfg
@@ -2252,17 +2061,13 @@ class FusedDetector:
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         if self.model is None:
-            raise RuntimeError('先 fit 再 predict')
+            raise RuntimeError('Call fit before predict')
         return self.model.predict_proba(X)[:, 1].astype(np.float64)
 
     def shap_contributions(self, X: np.ndarray) -> np.ndarray:
-        """TreeSHAP 归因，末列是 base value，这里裁掉只留特征贡献。
-
-        直接走 booster 的 pred_contribs 而不是 shap 包：结果完全一致（都是 TreeSHAP 精确解），
-        但少一个依赖，且不受 shap 0.48 与 xgboost 3.x 之间那处已知的构造失败影响。
-        """
+        """Return TreeSHAP feature contributions, excluding the base-value column."""
         if self.model is None:
-            raise RuntimeError('先 fit 再解释')
+            raise RuntimeError('Call fit before attribution')
         booster = self.model.get_booster()
         matrix = xgb.DMatrix(X, feature_names=self.feature_names)
         return booster.predict(matrix, pred_contribs=True)[:, :-1]
@@ -2299,7 +2104,7 @@ from .semantic import build_semantic
 
 @dataclass
 class Workspace:
-    """跨消融臂复用的部分：数据、切分与 x_base。这三样与臂无关，重复算是纯浪费。"""
+    """Dataset, splits, and base features shared across configurations."""
     cfg: Dict[str, Any]
     dataset: Dataset
     frame: pd.DataFrame
@@ -2320,15 +2125,11 @@ def build_workspace(cfg: Dict[str, Any], verbose: bool=True) -> Workspace:
     space = fit_base_features(frame, splits.train)
     X_base = space.transform(frame)
     if verbose:
-        print(f"  [数据] {ds.name}: {len(frame):,} 行, 正类率 {ds.meta['positive_rate']:.6f}, 跨度 {ds.meta['time_span_days']:.1f} 天, 切分 {splits.sizes()}")
+        print(f"  [Data] {ds.name}: {len(frame):,} rows, positive rate {ds.meta['positive_rate']:.6f}, span {ds.meta['time_span_days']:.1f} days, splits {splits.sizes()}")
     return Workspace(cfg, ds, frame, splits, X_base, space.columns, y, time.perf_counter() - start)
 
 def _cached(ws: Workspace, layer: str, section: Mapping[str, Any], builder: Callable[[ContractAuditor], Any], auditor: ContractAuditor) -> Any:
-    """按层缓存产物，并把首次构建时产生的契约检查记录一并存下来重放。
-
-    不重放会让缓存命中的臂看上去"没做过检查"——那正是 memory 里那条"校验器通过要看
-    匹配计数"的翻版：审计记录数为 0 与真的没检查在输出上不可区分。
-    """
+    """Cache layer outputs together with their contract-check records."""
     digest = hashlib.blake2b(json.dumps(section, sort_keys=True, ensure_ascii=False, default=str).encode('utf-8'), digest_size=8).hexdigest()
     entry = ws.cache.get((layer, digest))
     if entry is None:
@@ -2344,16 +2145,7 @@ def _as_bool(setting: str) -> bool:
     return setting in _TRUTHY
 
 def _semantic_candidates(cfg: Mapping[str, Any], frame: pd.DataFrame) -> List[bool]:
-    """`auto` = 在调参段上选；`text_only` = §4.5 的原规则；true/false = 强制。
-
-    把 auto 从"看有没有原始文本"改成"在调参段上选"，是因为原规则被实测推翻：
-    TabFormer 的 `text` 字段声明为 n/a（无原始文本），按原规则应当关闭 Γ 序列化，
-    而调参段实测开启更好——24 个候选里 semantic=True 的最好一档 tune AP 0.5292，
-    semantic=False 的最好一档只有 0.3955，选中的那一档测试段 AP 0.5052。
-    （核对于 RQ1/results/raw/tabformer-cc_main.json，2026-09-04 那轮；2026-09-08 复核。
-    注意 tabformer-cc 不在六数据集交付集内。）
-    原规则作为 `text_only` 保留，RQ2 里有对应的复现臂。
-    """
+    """Resolve semantic activation candidates for tuning-set selection."""
     setting = str(cfg.get('enabled', 'auto')).lower()
     if setting == 'auto':
         return [True, False]
@@ -2363,26 +2155,7 @@ def _semantic_candidates(cfg: Mapping[str, Any], frame: pd.DataFrame) -> List[bo
     return [_as_bool(setting)]
 
 def _context_candidates(cfg: Mapping[str, Any]) -> List[bool]:
-    """`auto` = 在调参段上选；true/false = 强制。与 `_semantic_candidates` 同构。
-
-    §4.5 确立的原则是"模块级开关不写成规则，而是在调参段上选"，但先前只对
-    `semantic.enabled` 落实了，`context.enabled` 一直写死为 true——于是 a_t 在数据
-    允许时一律强制开启，即使有害。补上这个开关不改任何算法，只是把同一条已有原则
-    落实到第二个模块，且选择只在调参段上做。
-
-    PaySim 是促成这条改动的数据集：图层因结构原因关闭，`xgboost_base_only` 的 AP
-    0.9239 高于 how123_full 的 0.9221，即三层合计仍是净负担。
-    （核对于 RQ1/results/raw/paysim_main.json，2026-09-04 那轮；2026-09-08 复核。
-    PaySim 不在六数据集交付集内。）
-
-    **本函数先前写在这里的那段 PaySim 叙述已被同一批产物推翻，故已改写**：它说
-    "语义层已被调参段选择关闭、唯一多出来的是 a_t"，而落盘的 layers 是
-    semantic=True / context=False；它引的 full AP 0.8811 与 ΔAP(−0.0427***) 在现有
-    raw 里都找不到（现值 0.9221 与 −0.00165，p=0.80）。方向性结论不变，数值不再复述。
-
-    调参段能不能在不看测试段的前提下选对方向，见 running/Diagnostics/d07_context_switch.py；
-    该脚本的具体数值本文件不复述，以免又留下一份无人复核的副本。
-    """
+    """Resolve history activation candidates for tuning-set selection."""
     setting = str(cfg.get('enabled', True)).lower()
     if setting == 'auto':
         return [True, False]
@@ -2397,31 +2170,7 @@ def _rho_candidates(cfg: Mapping[str, Any], graph_enabled: bool) -> List[Optiona
     return [float(setting)]
 
 def _zeta_candidates(cfg: Mapping[str, Any], graph_enabled: bool) -> List[Optional[str]]:
-    """ϱ 的第二重身份：作为 ζ 的乘子用不用。
-
-    `product` = ζ = X̃²·ϱ（§2.4.8 原式），`burst_only` = ζ = X̃²（只把 ϱ 当门，不当权重）。
-
-    与 `rho_quantile` 分开选，是因为 RQ2 在**测试段**上测出两重的成败并不一致：一侧是
-    ϱ≡1 更好（拖后腿的是权重那一重），另一侧是 ϱ≡1 更差，而后者选中的是
-    burst_only + 最低门分位，即权重与门都已不起作用——那部分差只能来自 ϱ 作为证据
-    向量里一个显式特征的那一重。绑在一起时没有任何数据集能同时拿到两边的好处。
-    （这两条 ΔAP 出自 RQ2；当前磁盘上的 RQ2/results/raw 与 rq2_results_v1.3.csv 对不上，
-    2026-09-08 复核时无法逐位复核，故此处只留结构、不再复述具体数值与 p 值。）
-
-    **但不要把"分开选"读成"选型能分辨它们"。** 调参段在 Sparkov 上对这两个配置的 AP 差是
-    3.428e-07（`margin_over_runner_up`，实测；product 0.99693695 对 burst_only 0.99693729），
-    即在任何有意义的精度上都是并列，胜负由第七位小数决定，不是选型识别出了权重有害。
-    要让选型真能分辨，得换一个对这一维更敏感的选型判据，或者在多个种子上取平均——两者都还没做。
-
-    门那一维要留神的是另一件事：收紧它会大幅压低覆盖率。IBM-AML 上有信号的行随分位从
-    35477/36022（q=0.0，两个 zeta 取法）掉到 635（q=0.5）与 281（q=0.75）；在 q=0.5 与
-    q=0.75 上两个 zeta 取法给出**完全相同**的 tune AP（0.09051、0.05957），说明剩下的信号
-    已经不足以区分权重取法。**但不能因此说"门只会饿死图层"**：同一张表里 q=0.5 的
-    tune AP 0.09051 是 24 个候选里的最高值并被选中，高于 q=0.0 的 0.07141。
-    （全部核对于 RQ1/results/raw/ibm-aml_main.json 与 sparkov_main.json 的
-    `selection_on_tune.table`，2026-09-04 那轮；2026-09-08 复核。此前这里写的
-    "4007 掉到 364/150"与"tune AP 随之塌回无图基线"在现有产物里都不成立。）
-    """
+    """Resolve intensity-weighting candidates independently of concentration gates."""
     if not graph_enabled:
         return [None]
     setting = cfg.get('zeta_mode', 'product')
@@ -2430,14 +2179,7 @@ def _zeta_candidates(cfg: Mapping[str, Any], graph_enabled: bool) -> List[Option
     return [str(setting)]
 
 def _select_on_tune(ws: Workspace, cfg: Dict[str, Any], gamma: SemanticSpec, context: ContextArtifacts, graph_base: GraphArtifacts, auditor: ContractAuditor, seed: int) -> Tuple[Any, ...]:
-    """在调参段上挑两个模块开关（h_dom、a_t）与 ϱ 的门/权重，返回获胜组合与其评分器。
-
-    获胜臂的评分器直接复用——早停本来就用调参段，选型也用调参段，两者同属 §3.2.1
-    定义的"选型"阶段。校准段与测试段在此之前一次都没有被读过。
-
-    `context` 参数传入的是**已按配置建好的那一份**；候选里需要"关闭"时不重建，
-    直接用一个零宽矩阵替代——上文块关闭的含义就是不往 s(x) 里拼任何 a_t 分量。
-    """
+    """Select modules and graph settings on tuning data and retain the fitted scorer."""
     frame, splits, y = (ws.frame, ws.splits, ws.y)
     criterion = str(get_path(cfg, 'evaluation.selection_criterion', 'ap'))
     alpha = float(get_path(cfg, 'constraint.alpha'))
@@ -2473,7 +2215,7 @@ def _select_on_tune(ws: Workspace, cfg: Dict[str, Any], gamma: SemanticSpec, con
                     if best is None or value > best['value']:
                         best = {'value': value, 'row': row, 'semantic': semantic, 'graph': graph, 'X': X, 'names': names, 'detector': detector, 'artifacts': artifacts}
     if best is None:
-        raise RuntimeError('调参段选型没有产生任何候选，s(x) 无从确定')
+        raise RuntimeError('Tuning produced no candidate scorer')
     for row in table:
         row['selected'] = row is best['row']
     value_key = 'tune_tpr_at_alpha' if criterion == 'tpr_at_alpha' else 'tune_ap'
@@ -2489,10 +2231,10 @@ def _stack(blocks: Sequence[Tuple[np.ndarray, Sequence[str]]]) -> Tuple[np.ndarr
     for _, block_names in blocks:
         names.extend(block_names)
     if not matrices:
-        raise ValueError('s(x) 没有任何输入特征')
+        raise ValueError('Scorer has no input features')
     stacked = np.hstack(matrices).astype(np.float32)
     if stacked.shape[1] != len(names):
-        raise ValueError(f's(x) 列数 {stacked.shape[1]} 与列名数 {len(names)} 不一致：{names}')
+        raise ValueError(f'Scorer column count {stacked.shape[1]} differs from feature-name count {len(names)}: {names}')
     return (stacked, names)
 
 def run_arm(ws: Workspace, cfg: Dict[str, Any], arm: str='how123', verbose: bool=True, score_transform=None) -> Dict[str, Any]:
@@ -2501,7 +2243,7 @@ def run_arm(ws: Workspace, cfg: Dict[str, Any], arm: str='how123', verbose: bool
     gamma = SemanticSpec.from_config(cfg['semantic'])
     auditor = ContractAuditor()
     timings: Dict[str, float] = {}
-    auditor.run('四段时间切分不重叠且时序不倒挂', lambda: splits.assert_valid(frame['ts'].to_numpy()), f'mode={splits.mode}, sizes={splits.sizes()}')
+    auditor.run('Four disjoint, chronologically ordered segments', lambda: splits.assert_valid(frame['ts'].to_numpy()), f'mode={splits.mode}, sizes={splits.sizes()}')
     t0 = time.perf_counter()
     context = _cached(ws, 'context', cfg['context'], lambda a: build_context(frame, splits.train, y, gamma, cfg['context'], seed, a), auditor)
     timings['context'] = time.perf_counter() - t0
@@ -2513,18 +2255,18 @@ def run_arm(ws: Workspace, cfg: Dict[str, Any], arm: str='how123', verbose: bool
     selection, semantic, graph, X, names, detector, det_artifacts = _select_on_tune(ws, cfg, gamma, context, graph_base, auditor, seed)
     timings['selection'] = time.perf_counter() - t0
     context_selected = bool(selection.get('chosen_context', context.matrix.shape[1] > 0))
-    auditor.record('契约一·判定后字段未进入语义表示', len(semantic.serialized_columns), True, f"序列化列 {list(semantic.serialized_columns)}；因 ω_j>t 排除 {list(semantic.excluded_by_omega) or '无'}")
-    auditor.run('控制层量未进入 s(x)', lambda: auditor.assert_control_not_in_scorer(names), 'S_t / m_t / ε_t 是布尔门与检验参数，不是风险分量（§4.3）')
+    auditor.record('Semantic inputs exclude post-event fields', len(semantic.serialized_columns), True, f"Serialized columns: {list(semantic.serialized_columns)}; excluded by availability time: {list(semantic.excluded_by_omega) or 'none'}")
+    auditor.run('Scorer inputs exclude control-layer quantities', lambda: auditor.assert_control_not_in_scorer(names), 'Screening gates and test parameters are excluded from risk features')
     if graph.enabled:
         gs = graph.stats
-        auditor.record('ϱ 阈值选定后的确认规模', int(gs.get('n_expanded', 0)), True, f"阈值={gs.get('rho_min_used')}；展开 {gs.get('n_expanded')} → 结构确认 {gs.get('n_structure_confirmed')}（仅时间异常 {gs.get('n_time_only')}，无路径 {gs.get('n_no_path')}）；拿到非零 g_t 的交易 {gs.get('n_rows_with_signal')}")
-    auditor.record('选型只用训练段与调参段', int(selection['n_candidates']), True, f"判据={selection['criterion']}；选中 semantic={selection['chosen_semantic']}, rho_quantile={selection['chosen_rho_quantile']}；校准段与测试段未参与")
+        auditor.record('Confirmations at the selected concentration threshold', int(gs.get('n_expanded', 0)), True, f"threshold={gs.get('rho_min_used')}; expanded {gs.get('n_expanded')} -> confirmed {gs.get('n_structure_confirmed')} (temporal-only {gs.get('n_time_only')}, no path {gs.get('n_no_path')}); transactions with nonzero graph features: {gs.get('n_rows_with_signal')}")
+    auditor.record('Selection uses training and tuning segments only', int(selection['n_candidates']), True, f"criterion={selection['criterion']}; selected semantic={selection['chosen_semantic']}, rho_quantile={selection['chosen_rho_quantile']}; calibration and test segments excluded")
     probe = leakage_probe(X, y, names, splits.train, splits.test)
-    auditor.flag('诊断·特征—标签相关性体检（判据取时间外测试段）', int(probe.get('n_features', 0)), not probe.get('flagged_on_test'), f"测试段 max|r|={probe.get('max_abs_r_test', float('nan')):.4f}（训练段 {probe.get('max_abs_r_train', float('nan')):.4f}）；测试段超阈值列 {probe.get('flagged_on_test') or '无'}")
+    auditor.flag('Feature-label correlation diagnostic on out-of-time test data', int(probe.get('n_features', 0)), not probe.get('flagged_on_test'), f"test max|r|={probe.get('max_abs_r_test', float('nan')):.4f} (train: {probe.get('max_abs_r_train', float('nan')):.4f}); flagged test columns: {probe.get('flagged_on_test') or 'none'}")
     lifecycle = ScorerLifecycle()
     lifecycle.enter_tuning()
     scorer_version = lifecycle.freeze()
-    auditor.record('契约三·评分器在校准前冻结', 1, True, f'state={lifecycle.state}, version={scorer_version}, best_iteration={det_artifacts.best_iteration}')
+    auditor.record('Scorer frozen before calibration', 1, True, f'state={lifecycle.state}, version={scorer_version}, best_iteration={det_artifacts.best_iteration}')
     alpha = float(get_path(cfg, 'constraint.alpha'))
     delta = float(get_path(cfg, 'constraint.delta'))
     method = str(get_path(cfg, 'constraint.method'))
@@ -2544,7 +2286,7 @@ def run_arm(ws: Workspace, cfg: Dict[str, Any], arm: str='how123', verbose: bool
         calibration_dict = {'method': method, 'status': 'INFEASIBLE', 'detail': str(exc), 'n_negative': int(cal_negatives.size)}
         threshold = float('inf')
     n_min = getattr(calibrator, 'n_min', 'n/a')
-    auditor.record('约束层·独立校准集只含未参与训练与选型的样本', int(cal_negatives.size), calibration_error is None, calibration_error or f'n_0={cal_negatives.size}, n_0,min={n_min}')
+    auditor.record('Independent calibration samples excluded from training and selection', int(cal_negatives.size), calibration_error is None, calibration_error or f'n_0={cal_negatives.size}, n_0,min={n_min}')
     t0 = time.perf_counter()
     test_scores = detector.predict(X[splits.test])
     if score_transform is not None:
@@ -2559,7 +2301,7 @@ def run_arm(ws: Workspace, cfg: Dict[str, Any], arm: str='how123', verbose: bool
     timings['shap'] = time.perf_counter() - t0
     novelty = graph.stats.get('novelty', {}) if graph.enabled else {}
     n_added = (int(semantic.matrix.shape[1]) if semantic.enabled else 0) + (int(context.matrix.shape[1]) if context_selected else 0) + (int(graph.matrix.shape[1]) if graph.enabled else 0)
-    result: Dict[str, Any] = {'degenerate_to_x_base': bool(n_added == 0), 'arm': arm, 'dataset': ws.dataset.name, 'seed': seed, 'config_digest': config_digest(cfg), 'dataset_meta': ws.dataset.meta, 'split_sizes': splits.sizes(), 'split_mode': splits.mode, 'selection_on_tune': selection, 'layers': {'L1_semantic': {'enabled': semantic.enabled, 'reason': semantic.reason, 'dim': int(semantic.matrix.shape[1]), 'excluded_by_omega': list(semantic.excluded_by_omega), 'serialized_columns': list(semantic.serialized_columns), 'example': semantic.example_serialization[:600]}, 'L1_context': {'enabled': bool(context_selected), 'reason': context.reason if context_selected else f'调参段选择关闭（{context.reason}）', 'mode': context.mode, 'negative_control': context.negative_control, 'dim': int(context.matrix.shape[1]) if context_selected else 0, 'admission': context.admission, 'training': context.training}, 'L2_graph': {'enabled': graph.enabled, 'reason': graph.reason, 'dim': int(graph.matrix.shape[1]), 'stats': graph.stats, 'n_patterns_exported': len(graph.patterns), 'novelty': novelty}, 'L3_constraint': {'method': method, 'alpha': alpha, 'delta': delta, 'capacity_per_window': get_path(cfg, 'constraint.capacity_per_window')}}, 'detector': {'best_iteration': det_artifacts.best_iteration, 'best_score_aucpr_tune': det_artifacts.best_score, 'n_features': det_artifacts.n_features, 'params': det_artifacts.params, 'top_gain': det_artifacts.global_importance[:15]}, 'calibration': calibration_dict, 'capacity_gate': {'candidates': gate.candidates, 'emitted': gate.emitted, 'capacity_limited': gate.capacity_limited, 'capacity': gate.capacity}, 'test_metrics': metrics.to_dict(), 'leakage_probe': probe, 'contracts': auditor.to_dict(), 'timings_seconds': {k: round(v, 3) for k, v in timings.items()}, 'explanations': explanations, 'patterns_preview': [p.to_dict() for p in graph.patterns[:10]]}
+    result: Dict[str, Any] = {'degenerate_to_x_base': bool(n_added == 0), 'arm': arm, 'dataset': ws.dataset.name, 'seed': seed, 'config_digest': config_digest(cfg), 'dataset_meta': ws.dataset.meta, 'split_sizes': splits.sizes(), 'split_mode': splits.mode, 'selection_on_tune': selection, 'layers': {'L1_semantic': {'enabled': semantic.enabled, 'reason': semantic.reason, 'dim': int(semantic.matrix.shape[1]), 'excluded_by_omega': list(semantic.excluded_by_omega), 'serialized_columns': list(semantic.serialized_columns), 'example': semantic.example_serialization[:600]}, 'L1_context': {'enabled': bool(context_selected), 'reason': context.reason if context_selected else f'Disabled by tuning selection ({context.reason})', 'mode': context.mode, 'negative_control': context.negative_control, 'dim': int(context.matrix.shape[1]) if context_selected else 0, 'admission': context.admission, 'training': context.training}, 'L2_graph': {'enabled': graph.enabled, 'reason': graph.reason, 'dim': int(graph.matrix.shape[1]), 'stats': graph.stats, 'n_patterns_exported': len(graph.patterns), 'novelty': novelty}, 'L3_constraint': {'method': method, 'alpha': alpha, 'delta': delta, 'capacity_per_window': get_path(cfg, 'constraint.capacity_per_window')}}, 'detector': {'best_iteration': det_artifacts.best_iteration, 'best_score_aucpr_tune': det_artifacts.best_score, 'n_features': det_artifacts.n_features, 'params': det_artifacts.params, 'top_gain': det_artifacts.global_importance[:15]}, 'calibration': calibration_dict, 'capacity_gate': {'candidates': gate.candidates, 'emitted': gate.emitted, 'capacity_limited': gate.capacity_limited, 'capacity': gate.capacity}, 'test_metrics': metrics.to_dict(), 'leakage_probe': probe, 'contracts': auditor.to_dict(), 'timings_seconds': {k: round(v, 3) for k, v in timings.items()}, 'explanations': explanations, 'patterns_preview': [p.to_dict() for p in graph.patterns[:10]]}
     result['_scores'] = test_scores
     result['_calibration_scores'] = cal_scores
     result['_tune_scores'] = detector.predict(X[splits.tune])
@@ -2582,41 +2324,20 @@ def _pearson_against_label(X: np.ndarray, y: np.ndarray, idx: np.ndarray) -> Opt
     return np.nan_to_num(r, nan=0.0)
 
 def leakage_probe(X: np.ndarray, y: np.ndarray, names: Sequence[str], train_idx: np.ndarray, test_idx: np.ndarray, flag_threshold: float=0.5, top_k: int=10) -> Dict[str, Any]:
-    """逐特征与标签的 |Pearson r|，训练段与测试段各算一遍。
-
-    这是本课题反复需要的一项体检，不是装饰：它要指出该去核对哪一列。
-
-    **判据放在测试段而不是训练段。** `ctx_proj_*` 是带标签学出来的投影，它在训练段上与
-    标签高度相关可能只是样本内乐观；真正的泄漏会**同时**在时间外测试段保持高相关。
-    因此审计断言取测试段，训练段的数字照报，两者之差正是样本内乐观的规模。
-
-    单条 |r| 高仍**不等于**泄漏（强真信号也会高），但超阈值的列必须逐一交代。
-
-    2026-09-08 对 RQ1/results/raw/*_main.json（2026-09-04 那轮）逐个复核的现状：
-
-        intent-tx-18k   r_train 0.0851  r_test 0.0825  超阈值 0 列
-        sparkov         r_train 0.5015  r_test 0.5981  超阈值 9 列，契约状态 REVIEW
-        其余七个数据集   r_test ≤ 0.4997，超阈值 0 列（banksim 0.4997 最接近阈值）
-
-    **这与本函数原先写在这里的那段说明正好相反，故已改写。** 原文举 intent-tx-18k 为
-    "配对生成假象被暴露"的例子、举 Sparkov"最大 |r| 只有 0.093"为无假象的依据；产物里
-    是 intent-tx-18k 干净而 Sparkov 触发了 REVIEW（`ctx_effective_count` 与 `ctx_proj_0..7`
-    共 9 列 |r_test| > 0.5，其中 `ctx_effective_count` 达 0.598）。Sparkov 属于六数据集
-    交付集，这条 REVIEW 需要在正文里给出解释或撤下，不能只当成注释里的旧例子。
-    """
+    """Report feature-label correlations; test-set exceedances trigger review, not proof of leakage."""
     r_train = _pearson_against_label(X, y, train_idx)
     r_test = _pearson_against_label(X, y, test_idx)
     if r_train is None or r_test is None:
-        return {'n_features': len(names), 'note': '某一切分只有单一类别，相关性无定义'}
+        return {'n_features': len(names), 'note': 'Correlation is undefined for a single-class segment'}
     order = np.argsort(np.abs(r_test))[::-1][:top_k]
     flagged = [names[int(i)] for i in np.flatnonzero(np.abs(r_test) > flag_threshold)]
     return {'n_features': len(names), 'n_rows_train': int(train_idx.size), 'n_rows_test': int(test_idx.size), 'flag_threshold': flag_threshold, 'flagged_on_test': flagged, 'max_abs_r_train': float(np.abs(r_train).max()), 'max_abs_r_test': float(np.abs(r_test).max()), 'top_by_test': [{'feature': names[int(i)], 'r_test': float(r_test[int(i)]), 'r_train': float(r_train[int(i)])} for i in order]}
 
 def _explain(detector: FusedDetector, X_test: np.ndarray, alerts: np.ndarray, n_examples: int, top_k: int) -> Dict[str, Any]:
-    """只对被告警的交易做归因——底座里 Investigation Agent 也只在可疑时才被调用。"""
+    """Compute feature attributions for alerted test transactions."""
     idx = np.flatnonzero(alerts)[:n_examples]
     if idx.size == 0:
-        return {'n_alerts_explained': 0, 'examples': [], 'note': '测试段无告警，无可归因样本'}
+        return {'n_alerts_explained': 0, 'examples': [], 'note': 'No test alerts to explain'}
     tops = detector.explain_top_k(X_test[idx], top_k)
     return {'n_alerts_explained': int(idx.size), 'examples': [{'test_row': int(r), 'top_features': t} for r, t in zip(idx, tops)]}
 
@@ -2624,18 +2345,18 @@ def _print_arm(result: Dict[str, Any]) -> None:
     m = result['test_metrics']
     layers = result['layers']
     n_pos = int(m.get('n_positive', 0))
-    print(f"  [臂] {result['arm']:<28} P={m['precision']:.4f} R={m['tpr']:.4f} AUC-ROC={m['auroc']:.4f} Acc={m['accuracy']:.6f}")
-    print(f"        AP={m['ap']:.5f} (×{m['ap_lift']:.1f} 基率)  TPR@FPR=1%={m['tpr_at_fpr'].get('0.01', float('nan')):.4f}  正类 {n_pos}")
-    print(f"        L1 语义 {('ON ' if layers['L1_semantic']['enabled'] else 'OFF')}(d={layers['L1_semantic']['dim']}) | L1 上文 {('ON ' if layers['L1_context']['enabled'] else 'OFF')}(d={layers['L1_context']['dim']}) | L2 图 {('ON ' if layers['L2_graph']['enabled'] else 'OFF')}(d={layers['L2_graph']['dim']}) | L3 {result['calibration'].get('status')}")
+    print(f"  [Configuration] {result['arm']:<28} P={m['precision']:.4f} R={m['tpr']:.4f} AUC-ROC={m['auroc']:.4f} Acc={m['accuracy']:.6f}")
+    print(f"        AP={m['ap']:.5f} (×{m['ap_lift']:.1f} base rate)  TPR@FPR=1%={m['tpr_at_fpr'].get('0.01', float('nan')):.4f}  positives {n_pos}")
+    print(f"        L1 semantic {('ON ' if layers['L1_semantic']['enabled'] else 'OFF')}(d={layers['L1_semantic']['dim']}) | L1 context {('ON ' if layers['L1_context']['enabled'] else 'OFF')}(d={layers['L1_context']['dim']}) | L2 graph {('ON ' if layers['L2_graph']['enabled'] else 'OFF')}(d={layers['L2_graph']['dim']}) | L3 {result['calibration'].get('status')}")
     sel = result.get('selection_on_tune', {})
     if sel.get('n_candidates', 0) > 1:
         margin = sel.get('margin_over_runner_up')
         tied = sel.get('n_tied_at_best') or 1
-        quality = '并列 %d 条，按遍历顺序取胜' % tied if tied > 1 else '余量 %.5f' % (margin if margin is not None else float('nan'))
-        print(f"        调参段选型（{sel['criterion']}，{sel['n_candidates']} 个候选，{quality}）：semantic={sel['chosen_semantic']}, ϱ门分位={sel['chosen_rho_quantile']}, ζ={sel.get('chosen_zeta_mode')}，tune AP={sel['chosen_tune_ap']:.5f}")
-    print(f"        阈值 T={m['threshold']:.6g}  告警 {m['n_alert']}  TP={m['n_tp']} FP={m['n_fp']}  实测 FPR={m['fpr']:.6f}  U_FP={m['fpr_upper_bound']:.6f}  约束{('通过' if m['constraint_satisfied'] else '未通过')}")
+        quality = '%d tied candidates; first in iteration order selected' % tied if tied > 1 else 'margin %.5f' % (margin if margin is not None else float('nan'))
+        print(f"        Tuning selection ({sel['criterion']}, {sel['n_candidates']} candidates, {quality}): semantic={sel['chosen_semantic']}, concentration quantile={sel['chosen_rho_quantile']}, ζ={sel.get('chosen_zeta_mode')}, tune AP={sel['chosen_tune_ap']:.5f}")
+    print(f"        threshold T={m['threshold']:.6g}  alerts {m['n_alert']}  TP={m['n_tp']} FP={m['n_fp']}  observed FPR={m['fpr']:.6f}  U_FP={m['fpr_upper_bound']:.6f}  constraint {('PASSED' if m['constraint_satisfied'] else 'FAILED')}")
     contracts = result['contracts']
-    print(f"        {('契约审计通过' if contracts['passed'] else '契约审计未通过')}：{contracts['n_passed']} PASSED / {contracts['n_failed']} FAILED / {contracts.get('n_review', 0)} REVIEW / {contracts['n_skipped']} SKIPPED")
+    print(f"        {('Contract audit PASSED' if contracts['passed'] else 'Contract audit FAILED')}: {contracts['n_passed']} PASSED / {contracts['n_failed']} FAILED / {contracts.get('n_review', 0)} REVIEW / {contracts['n_skipped']} SKIPPED")
 ''', _ROOT=_ROOT, _DATASET=_DATASET, _OUTPUT=_OUTPUT, _DATA=_DATA, _CONFIGS=_CONFIGS)
 
 DATASETS = tuple(_DATA['ours_config']['configs'])
