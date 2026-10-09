@@ -7,7 +7,7 @@ Raw transaction data is downloaded separately. This directory provides expected 
 Download [BankSim](https://www.kaggle.com/datasets/ealaxi/banksim1), extract `bs140513_032310.csv`, and place it at:
 
 ```text
-dataset/banksim/bs140513_032310.csv
+datasets/banksim/bs140513_032310.csv
 ```
 
 ## IBM-AML
@@ -15,9 +15,9 @@ dataset/banksim/bs140513_032310.csv
 The [IBM AML-Data repository](https://github.com/IBM/AML-Data) describes the synthetic data and links to the [IBM transactions dataset on Kaggle](https://www.kaggle.com/datasets/ealtman2019/ibm-transactions-for-anti-money-laundering-aml). Download and extract these three files:
 
 ```text
-dataset/ibm-aml/HI-Small_Trans.csv
-dataset/ibm-aml-medium/HI-Medium_Trans.csv
-dataset/ibm-aml-li/LI-Small_Trans.csv
+datasets/ibm-aml/HI-Small_Trans.csv
+datasets/ibm-aml-medium/HI-Medium_Trans.csv
+datasets/ibm-aml-li/LI-Small_Trans.csv
 ```
 
 The manifest also records `ibm-aml/pattern_labels.csv`, an optional sidecar in the original local research package. It is not needed by the released full-model CLI and need not be recreated.
@@ -34,20 +34,20 @@ Download both Parquet shards in their listed order:
 From the repository root, convert them to the expected CSV:
 
 ```bash
-python dataset/prepare.py --dataset sparkov --parquet /path/to/train-00000-of-00002.parquet /path/to/train-00001-of-00002.parquet
+python datasets/prepare.py --dataset sparkov --parquet /path/to/train-00000-of-00002.parquet /path/to/train-00001-of-00002.parquet
 ```
 
-The output is `dataset/sparkov/transactions_full.csv`.
+The output is `datasets/sparkov/transactions_full.csv`.
 
 ## IEEE-CIS
 
 Use the prepared feature export [Kshitijbhatt1998/ieee-fraud-detection-pipeline-features](https://huggingface.co/datasets/Kshitijbhatt1998/ieee-fraud-detection-pipeline-features). Download [fraud_features.parquet](https://huggingface.co/datasets/Kshitijbhatt1998/ieee-fraud-detection-pipeline-features/resolve/6e9f80920753c5ab24af9c68e0d198a356994f5a/fraud_features.parquet), then run:
 
 ```bash
-python dataset/prepare.py --dataset ieee-cis --parquet /path/to/fraud_features.parquet
+python datasets/prepare.py --dataset ieee-cis --parquet /path/to/fraud_features.parquet
 ```
 
-The output is `dataset/ieee-cis/ieee_cis_fraud_features.csv`. The original [IEEE-CIS competition files](https://www.kaggle.com/c/ieee-fraud-detection/data) require feature preparation and cannot simply be renamed to this file: the loader expects the prepared feature schema.
+The output is `datasets/ieee-cis/ieee_cis_fraud_features.csv`. The original [IEEE-CIS competition files](https://www.kaggle.com/c/ieee-fraud-detection/data) require feature preparation and cannot simply be renamed to this file: the loader expects the prepared feature schema.
 
 ## Export format and verification
 

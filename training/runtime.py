@@ -8,12 +8,14 @@ from pathlib import Path
 
 import pandas as pd
 
-MODEL = Path(__file__).resolve().parents[1]
-ROOT = MODEL.parent
-CONFIG = MODEL / "config"
-DATASET = Path(os.environ.get("MAS_DATASET_DIR", str(ROOT / "dataset"))).resolve()
+ROOT = Path(__file__).resolve().parents[1]
+MODEL = ROOT / "model"
+CONFIG = ROOT / "training" / "configs"
+DATASET = Path(os.environ.get("MAS_DATASET_DIR", str(ROOT / "datasets"))).resolve()
 OUTPUT = Path(os.environ.get("MAS_OUTPUT_DIR", str(ROOT / "outputs"))).resolve()
-CSV_SCHEMA = json.loads((CONFIG / "csv_schema.json").read_text(encoding="utf-8"))
+CSV_SCHEMA = json.loads(
+    (ROOT / "datasets" / "csv_schema.json").read_text(encoding="utf-8")
+)
 
 
 def read_dataset_csv(path):

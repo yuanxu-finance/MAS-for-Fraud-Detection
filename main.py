@@ -17,7 +17,7 @@ DATASETS = ("banksim", "sparkov", "ieee-cis", "ibm-aml", "ibm-aml-medium", "ibm-
 
 def verify_data(root: Path, dataset: str) -> bool:
     manifest = json.loads(
-        (ROOT / "dataset" / "manifest.json").read_text(encoding="utf-8")
+        (ROOT / "datasets" / "manifest.json").read_text(encoding="utf-8")
     )
     passed = True
     for entry in manifest["files"]:
@@ -71,7 +71,7 @@ def main(argv=None):
     parser.add_argument(
         "--datasets-dir",
         type=Path,
-        default=Path(os.environ.get("MAS_DATASET_DIR", ROOT / "dataset")),
+        default=Path(os.environ.get("MAS_DATASET_DIR", ROOT / "datasets")),
     )
     parser.add_argument(
         "--output",
@@ -107,7 +107,7 @@ def main(argv=None):
         return 0 if verify_data(args.datasets_dir.resolve(), args.dataset) else 1
 
     from training.pipeline import load_config, run
-    from model.sera.config import validate
+    from training.config import validate
 
     cfg = load_config(args.dataset, args.seed)
     if args.window_rows is not None:

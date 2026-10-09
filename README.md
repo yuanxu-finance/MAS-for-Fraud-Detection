@@ -28,9 +28,9 @@ An XGBoost detector combines base, semantic, historical, and graph features. Tra
 
 ## Datasets
 
-The evaluation uses six transaction datasets. **Download data separately** using the [data preparation guide](dataset/README.md). The repository includes expected directories, CSV schemas, and a [SHA-256 reference manifest](dataset/manifest.json).
+The evaluation uses six transaction datasets. **Download data separately** using the [data preparation guide](datasets/README.md). The repository includes expected directories, CSV schemas, and a [SHA-256 reference manifest](datasets/manifest.json).
 
-| Selector | Dataset | Expected file under `dataset/` |
+| Selector | Dataset | Expected file under `datasets/` |
 |---|---|---|
 | `banksim` | BankSim | `banksim/bs140513_032310.csv` |
 | `sparkov` | Sparkov | `sparkov/transactions_full.csv` |
@@ -66,16 +66,15 @@ The research examines field encoding, admitted history, graph evidence, and thre
 
 ## Sensitivity
 
-The research studies history count, lookback window, target FPR, and calibration risk budget. Dataset-specific full-model settings are stored in `model/config/datasets.json` and recorded in each run's JSON output.
+The research studies history count, lookback window, target FPR, and calibration risk budget. Dataset-specific full-model settings are stored in `training/configs/datasets.json` and recorded in each run's JSON output.
 
 ## Code Structure
 
-- `model/SERA.py`: the `SERA` model, from evidence construction and fusion fitting to calibration and evaluation.
-- `model/sera/semantic.py`, `context.py`, and `graph.py`: field, historical, and relational evidence.
-- `model/sera/detector.py` and `constraint.py`: fusion scoring and risk calibration.
-- `training/pipeline.py`: dataset loading, temporal splits, and model execution.
-- `model/sera/contracts.py`, `datasets.py`, `features.py`, and `metrics.py`: checks, data handling, base features, and metrics.
-- `model/config/`: dataset configurations and CSV schemas.
+- `model/SERA.py`: semantic and historical encoding, temporal graph evidence, fusion scoring, risk calibration, and the `SERA` pipeline.
+- `training/pipeline.py`: dataset preparation and model execution.
+- `training/datasets.py`, `features.py`, and `metrics.py`: data loading, base features, and evaluation.
+- `training/configs/`: dataset-specific model settings.
+- `datasets/`: data preparation instructions, CSV schemas, and reference checksums.
 
 Use `from model import SERA` to access the model. `SERA(config).fit_evaluate(workspace)` executes the evidence-to-decision pipeline. The command-line workflow prepares the workspace automatically. Existing `model.SERA.load_config` and `model.SERA.run` imports remain available.
 
@@ -130,7 +129,7 @@ Release validation covered imports and configurations for all six datasets, chec
 
 ```text
 MAS-for-Fraud-Detection/
-|-- dataset/                  download instructions, schemas, and checksums
+|-- datasets/                 download instructions, schemas, and checksums
 |   |-- banksim/
 |   |-- sparkov/
 |   |-- ieee-cis/
@@ -141,11 +140,17 @@ MAS-for-Fraud-Detection/
 |   |-- csv_schema.json
 |   `-- manifest.json
 |-- model/
-|   |-- SERA.py               core SERA model pipeline
-|   |-- sera/                 evidence, scoring, calibration, and supporting modules
-|   `-- config/               dataset configurations and schemas
+|   |-- SERA.py               core modules and model pipeline
+|   `-- __init__.py
 |-- training/
-|   `-- pipeline.py           dataset preparation and model execution
+|   |-- pipeline.py           dataset preparation and model execution
+|   |-- datasets.py
+|   |-- features.py
+|   |-- metrics.py
+|   |-- config.py
+|   |-- runtime.py
+|   |-- configs/
+|   `-- __init__.py
 |-- main.py                   command-line entry point and data verification
 |-- requirements.txt
 |-- requirements-tested.txt

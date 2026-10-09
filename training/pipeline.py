@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Any, Dict
 
 from model import SERA
-from model.sera import datasets
-from model.sera.config import DATASETS, get_path, load_model_config as load_config
-from model.sera.datasets import Workspace, load_dataset, make_splits
-from model.sera.features import fit_base_features
-from model.sera.runtime import DATASET, OUTPUT
+from . import datasets
+from .config import DATASETS, get_path, load_model_config as load_config
+from .datasets import Workspace, load_dataset, make_splits
+from .features import fit_base_features
+from .runtime import DATASET, OUTPUT
 
 
 def build_workspace(cfg: Dict[str, Any], verbose: bool = True) -> Workspace:
