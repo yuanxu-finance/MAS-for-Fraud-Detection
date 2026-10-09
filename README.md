@@ -70,12 +70,14 @@ The research studies history count, lookback window, target FPR, and calibration
 
 ## Code Structure
 
-- `model/SERA.py`: public `load_config` and `run` entry points.
+- `model/SERA.py`: the `SERA` model, from evidence construction and fusion fitting to calibration and evaluation.
 - `model/sera/semantic.py`, `context.py`, and `graph.py`: field, historical, and relational evidence.
 - `model/sera/detector.py` and `constraint.py`: fusion scoring and risk calibration.
-- `model/sera/pipeline.py`: training, selection, calibration, and evaluation.
+- `training/pipeline.py`: dataset loading, temporal splits, and model execution.
 - `model/sera/contracts.py`, `datasets.py`, `features.py`, and `metrics.py`: checks, data handling, base features, and metrics.
 - `model/config/`: dataset configurations and CSV schemas.
+
+Use `from model import SERA` to access the model. `SERA(config).fit_evaluate(workspace)` executes the evidence-to-decision pipeline. The command-line workflow prepares the workspace automatically. Existing `model.SERA.load_config` and `model.SERA.run` imports remain available.
 
 ## Implementation Notes
 
@@ -139,8 +141,12 @@ MAS-for-Fraud-Detection/
 |   |-- csv_schema.json
 |   `-- manifest.json
 |-- model/
-|   `-- SERA.py               full SERA pipeline and dataset configurations
-|-- main.py                   training, evaluation, and data verification
+|   |-- SERA.py               core SERA model pipeline
+|   |-- sera/                 evidence, scoring, calibration, and supporting modules
+|   `-- config/               dataset configurations and schemas
+|-- training/
+|   `-- pipeline.py           dataset preparation and model execution
+|-- main.py                   command-line entry point and data verification
 |-- requirements.txt
 |-- requirements-tested.txt
 `-- README.md

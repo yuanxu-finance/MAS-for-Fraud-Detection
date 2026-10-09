@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 import os
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
@@ -468,3 +468,18 @@ def make_splits(
         raise ValueError(f"Unknown split mode {mode!r}")
     splits.assert_valid(frame["ts"].to_numpy())
     return splits
+
+
+@dataclass
+class Workspace:
+    """Dataset, splits, and base features shared across configurations."""
+
+    cfg: Dict[str, Any]
+    dataset: Dataset
+    frame: pd.DataFrame
+    splits: Splits
+    X_base: np.ndarray
+    base_names: List[str]
+    y: np.ndarray
+    load_seconds: float = 0.0
+    cache: Dict[Tuple[str, str], Any] = field(default_factory=dict)

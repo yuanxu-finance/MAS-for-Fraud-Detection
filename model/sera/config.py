@@ -140,3 +140,16 @@ def config_digest(cfg: Mapping[str, Any]) -> str:
         "utf-8"
     )
     return hashlib.blake2b(payload, digest_size=8).hexdigest()
+
+
+_MODEL_CONFIGS = json.loads((CONFIG / "datasets.json").read_text(encoding="utf-8"))
+DATASETS = tuple(_MODEL_CONFIGS)
+
+
+def load_model_config(dataset: str, seed: int = 2026) -> Dict[str, Any]:
+    """Return an independent copy of a full-model dataset configuration."""
+    if dataset not in DATASETS:
+        raise ValueError(f"Unknown dataset: {dataset}; choose from {DATASETS}")
+    config = copy.deepcopy(_MODEL_CONFIGS[dataset])
+    config["seed"] = seed
+    return config

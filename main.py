@@ -106,7 +106,7 @@ def main(argv=None):
     if args.verify_data:
         return 0 if verify_data(args.datasets_dir.resolve(), args.dataset) else 1
 
-    from model.SERA import load_config, run
+    from training.pipeline import load_config, run
     from model.sera.config import validate
 
     cfg = load_config(args.dataset, args.seed)
